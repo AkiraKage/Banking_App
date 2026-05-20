@@ -48,7 +48,11 @@ class TransactionsHistoryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final groupedTransactions = _groupTransactions(allTransactions);
+    // Ordina le transazioni per data decrescente (più recenti prima)
+    final sortedTransactions = List<TransactionModel>.from(allTransactions)
+      ..sort((a, b) => b.date.compareTo(a.date));
+
+    final groupedTransactions = _groupTransactions(sortedTransactions);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Storico Transazioni')),

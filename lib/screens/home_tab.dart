@@ -23,8 +23,12 @@ class _HomeTabState extends State<HomeTab> {
 
   @override
   Widget build(BuildContext context) {
-    final displayTransactions = demoTransactions.take(8).toList();
-    final bool hasMoreTransactions = demoTransactions.length > 8;
+    // Ordina le transazioni per data decrescente per mostrare i movimenti più recenti
+    final sortedTransactions = List<TransactionModel>.from(demoTransactions)
+      ..sort((a, b) => b.date.compareTo(a.date));
+
+    final displayTransactions = sortedTransactions.take(8).toList();
+    final bool hasMoreTransactions = sortedTransactions.length > 8;
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -101,7 +105,7 @@ class _HomeTabState extends State<HomeTab> {
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
         children: [
           Text(
-            'Bentornato, Alok 👋',
+            'Bentornato, Alok.',
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
@@ -201,8 +205,8 @@ class _HomeTabState extends State<HomeTab> {
         : Colors.redAccent;
 
     final iconBgColor = transaction.type == TransactionType.income
-        ? Theme.of(context).colorScheme.secondary.withOpacity(0.1)
-        : Colors.redAccent.withOpacity(0.1);
+        ? Theme.of(context).colorScheme.secondary.withValues(alpha: 0.1)
+        : Colors.redAccent.withValues(alpha: 0.1);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -222,25 +226,15 @@ class _HomeTabState extends State<HomeTab> {
             color: iconBgColor,
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Icon(
-            transaction.getIcon,
-            color: amountColor,
-            size: 22,
-          ),
+          child: Icon(transaction.getIcon, color: amountColor, size: 22),
         ),
         title: Text(
           transaction.title,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 14,
-          ),
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
         ),
         subtitle: Text(
           transaction.formattedDate,
-          style: TextStyle(
-            color: Colors.grey.shade500,
-            fontSize: 11,
-          ),
+          style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
         ),
         trailing: Text(
           transaction.formattedAmount,

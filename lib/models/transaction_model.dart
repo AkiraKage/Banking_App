@@ -5,11 +5,17 @@ enum TransactionType { income, expense }
 // Categorie possibili
 enum TransactionCategory {
   shopping,
+  transport,
+  food,
+  entertainment,
+  health,
   travel,
-  pharmacy,
+  utilities,
   salary,
   transfer,
-  utilities,
+  education,
+  subscriptions,
+  other,
 }
 
 class TransactionModel {
@@ -31,17 +37,29 @@ class TransactionModel {
   IconData get getIcon {
     switch (category) {
       case TransactionCategory.shopping:
-        return Icons.shopping_cart;
+        return Icons.shopping_bag;
+      case TransactionCategory.transport:
+        return Icons.directions_car;
+      case TransactionCategory.food:
+        return Icons.restaurant;
+      case TransactionCategory.entertainment:
+        return Icons.movie;
+      case TransactionCategory.health:
+        return Icons.medical_services;
       case TransactionCategory.travel:
-        return Icons.flight_takeoff;
-      case TransactionCategory.pharmacy:
-        return Icons.local_pharmacy;
-      case TransactionCategory.salary:
-        return Icons.work;
-      case TransactionCategory.transfer:
-        return Icons.sync_alt;
+        return Icons.flight;
       case TransactionCategory.utilities:
         return Icons.bolt;
+      case TransactionCategory.salary:
+        return Icons.payments;
+      case TransactionCategory.transfer:
+        return Icons.sync_alt;
+      case TransactionCategory.education:
+        return Icons.school;
+      case TransactionCategory.subscriptions:
+        return Icons.subscriptions;
+      case TransactionCategory.other:
+        return Icons.more_horiz;
     }
   }
 
