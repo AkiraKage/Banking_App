@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/transaction_model.dart';
+import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
 import '../data/demo_transactions.dart';
-import 'login_screen.dart';
+import '../widgets/bank_card.dart';
+import '../widgets/monthly_summary.dart';
+import '../widgets/transaction_tile.dart';
 import 'transactions_history_screen.dart';
+import 'card_nfc_screen.dart';
 
 class HomeTab extends StatefulWidget {
   const HomeTab({super.key});
@@ -14,235 +18,143 @@ class HomeTab extends StatefulWidget {
 }
 
 class _HomeTabState extends State<HomeTab> {
-  void _handleLogout(BuildContext context) {
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => const LoginScreen()),
-    );
+  bool _balanceVisible = true;
+
+  static const double _balance = 2450.00;
+  static const double _incomeMonth = 2620.00;
+  static const double _expenseMonth = 1170.27;
+
+  Future<void> _onRefresh() async {
+    await Future.delayed(const Duration(milliseconds: 800));
+    if (mounted) setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
-    // Ordina le transazioni per data decrescente per mostrare i movimenti più recenti
-    final sortedTransactions = List<TransactionModel>.from(demoTransactions)
-      ..sort((a, b) => b.date.compareTo(a.date));
-
-    final displayTransactions = sortedTransactions.take(8).toList();
-    final bool hasMoreTransactions = sortedTransactions.length > 8;
-
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primary = Theme.of(context).colorScheme.primary;
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context);
 
-    final cardGradientColors = isDark
-        ? [const Color(0xFF1E3A8A), const Color(0xFF172554)]
-        : [
-            Theme.of(context).colorScheme.primary,
-            Theme.of(context).colorScheme.primary.withBlue(255),
-          ];
+    final sorted = List<TransactionModel>.from(demoTransactions)
+      ..sort((a, b) => b.date.compareTo(a.date));
+    final recent = sorted.take(8).toList();
+    final hasMore = sorted.length > 8;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Il mio Conto',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
+        title: const Text('Il mio Conto'),
         automaticallyImplyLeading: false,
         actions: [
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
-            onSelected: (value) {
-              if (value == 'theme') {
-                Provider.of<ThemeProvider>(
-                  context,
-                  listen: false,
-                ).toggleTheme();
-              } else if (value == 'logout') {
-                _handleLogout(context);
-              }
-            },
-            itemBuilder: (BuildContext context) => [
-              const PopupMenuItem(
-                value: 'theme',
-                child: Row(
-                  children: [
-                    Icon(Icons.brightness_6),
-                    SizedBox(width: 12),
-                    Text('Cambia Tema'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'settings',
-                child: Row(
-                  children: [
-                    Icon(Icons.settings),
-                    SizedBox(width: 12),
-                    Text('Impostazioni'),
-                  ],
-                ),
-              ),
-              const PopupMenuDivider(),
-              const PopupMenuItem(
-                value: 'logout',
-                child: Row(
-                  children: [
-                    Icon(Icons.logout, color: Colors.red),
-                    SizedBox(width: 12),
-                    Text(
-                      'Esci',
-                      style: TextStyle(
-                        color: Colors.red,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+          IconButton(
+            icon: Icon(
+              isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+            ),
+            tooltip: isDark ? 'Tema chiaro' : 'Tema scuro',
+            onPressed: themeProvider.toggleTheme,
           ),
+          const SizedBox(width: 4),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-        children: [
-          Text(
-            'Bentornato, Alok.',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Card(
-            color: Theme.of(context).colorScheme.primary,
-            elevation: 8,
-            shadowColor: Theme.of(
-              context,
-            ).colorScheme.primary.withValues(alpha: 0.4),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Container(
-              padding: const EdgeInsets.all(24.0),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: cardGradientColors,
+      body: RefreshIndicator(
+        onRefresh: _onRefresh,
+        color: primary,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16, left: 2),
+              child: Text(
+                'Bentornato, ${authProvider.userName}.',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  color: isDark
+                      ? const Color(0xFFF9FAFB)
+                      : const Color(0xFF111827),
                 ),
               ),
-              child: const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            ),
+            BankCard(
+              balance: _balance,
+              balanceVisible: _balanceVisible,
+              onToggleVisibility: () =>
+                  setState(() => _balanceVisible = !_balanceVisible),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const CardNfcScreen()),
+              ),
+              isDark: isDark,
+            ),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    'Saldo Disponibile',
-                    style: TextStyle(color: Colors.white70, fontSize: 16),
+                  Icon(
+                    Icons.touch_app_outlined,
+                    size: 12,
+                    color: isDark
+                        ? const Color(0xFF6B7280)
+                        : const Color(0xFF9CA3AF),
                   ),
-                  SizedBox(height: 8),
+                  const SizedBox(width: 4),
                   Text(
-                    '€ 2.450,00',
+                    'Tocca per pagare contactless',
                     style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 36,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  SizedBox(height: 16),
-                  Text(
-                    'IT02 L1234 56789 000000123456',
-                    style: TextStyle(
-                      color: Colors.white54,
-                      fontSize: 14,
-                      letterSpacing: 1.5,
+                      fontSize: 12,
+                      color: isDark
+                          ? const Color(0xFF6B7280)
+                          : const Color(0xFF9CA3AF),
                     ),
                   ),
                 ],
               ),
             ),
-          ),
-          const SizedBox(height: 24),
-          const Text(
-            'Movimenti Recenti',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 12),
-          // Rendering transazioni
-          ...displayTransactions.map(
-            (tx) => _buildDynamicTransactionItem(context, tx, isDark),
-          ),
-          if (hasMoreTransactions)
-            TextButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => TransactionsHistoryScreen(
-                      allTransactions: demoTransactions,
+            MonthlySummaryRow(
+              income: _incomeMonth,
+              expense: _expenseMonth,
+              isDark: isDark,
+            ),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Movimenti Recenti',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                ),
+                if (hasMore)
+                  TextButton(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => TransactionsHistoryScreen(
+                          allTransactions: demoTransactions,
+                        ),
+                      ),
+                    ),
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: Text(
+                      'Vedi tutto',
+                      style: TextStyle(
+                        color: primary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
-                );
-              },
-              child: const Text(
-                'Vedi tutte le transazioni',
-                style: TextStyle(fontSize: 16),
-              ),
+              ],
             ),
-          const SizedBox(height: 20),
-        ],
-      ),
-    );
-  }
-
-  // Widget dinamico transazioni
-  Widget _buildDynamicTransactionItem(
-    BuildContext context,
-    TransactionModel transaction,
-    bool isDark,
-  ) {
-    final amountColor = transaction.type == TransactionType.income
-        ? Theme.of(context).colorScheme.secondary
-        : Colors.redAccent;
-
-    final iconBgColor = transaction.type == TransactionType.income
-        ? Theme.of(context).colorScheme.secondary.withValues(alpha: 0.1)
-        : Colors.redAccent.withValues(alpha: 0.1);
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      elevation: 0,
-      color: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
-        ),
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
-        leading: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: iconBgColor,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(transaction.getIcon, color: amountColor, size: 22),
-        ),
-        title: Text(
-          transaction.title,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-        ),
-        subtitle: Text(
-          transaction.formattedDate,
-          style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
-        ),
-        trailing: Text(
-          transaction.formattedAmount,
-          style: TextStyle(
-            color: amountColor,
-            fontWeight: FontWeight.bold,
-            fontSize: 15,
-          ),
+            const SizedBox(height: 12),
+            ...recent.map((tx) => TransactionTile(tx: tx, isDark: isDark)),
+            const SizedBox(height: 8),
+          ],
         ),
       ),
     );

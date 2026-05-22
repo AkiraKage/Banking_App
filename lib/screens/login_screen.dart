@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
+import '../services/storage_service.dart';
+import '../services/biometric_service.dart';
+import '../widgets/pin_boxes_input.dart';
 import 'main_layout.dart';
+import 'shared_pin_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -10,143 +16,435 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController _usernameController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
+class _LoginScreenState extends State<LoginScreen>
+    with SingleTickerProviderStateMixin {
+  final _usernameController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _pinController = TextEditingController();
+  final _pinFocusNode = FocusNode();
+
+  late final AnimationController _animController;
+  late final Animation<double> _fadeAnim;
+  late final Animation<Offset> _slideAnim;
 
   String? _errorMessage;
   bool _isPasswordObscured = true;
+  bool _isLoading = true;
 
-  void _handleLogin() {
-    final username = _usernameController.text;
-    final password = _passwordController.text;
+  bool _isPinMode = false; // Se l'utente ha già configurato l'app
+  bool _isPinPromptActive = false; // Se l'utente ha cliccato "Sblocca l'app"
 
-    if (username == 'admin' && password == 'password123') {
-      setState(() => _errorMessage = null);
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const MainLayout()),
-      );
+  bool _isSubmitting = false;
+  String? _savedPin;
+  bool _useBiometrics = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    _fadeAnim = CurvedAnimation(parent: _animController, curve: Curves.easeOut);
+    _slideAnim = Tween<Offset>(
+      begin: const Offset(0, 0.04),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _animController, curve: Curves.easeOut));
+
+    _pinController.addListener(() {
+      if (mounted) setState(() {});
+    });
+
+    _checkInitialState();
+  }
+
+  @override
+  void dispose() {
+    _animController.dispose();
+    _usernameController.dispose();
+    _passwordController.dispose();
+    _pinController.dispose();
+    _pinFocusNode.dispose();
+    super.dispose();
+  }
+
+  Future<void> _checkInitialState() async {
+    _savedPin = await StorageService.getPin();
+    _useBiometrics = await StorageService.getBiometrics();
+
+    if (!mounted) return;
+
+    setState(() {
+      _isPinMode = _savedPin != null;
+      _isLoading = false;
+    });
+
+    _animController.forward();
+    // NOTA: Non chiamiamo più la biometria qui. Aspettiamo l'interazione dell'utente.
+  }
+
+  void _startUnlockProcess() {
+    setState(() {
+      _isPinPromptActive = true;
+      _errorMessage = null;
+    });
+
+    if (_useBiometrics) {
+      _authenticateBiometrics();
     } else {
-      setState(() {
-        _errorMessage = 'Credenziali non valide. Riprova.';
-      });
+      FocusScope.of(context).requestFocus(_pinFocusNode);
     }
+  }
+
+  Future<void> _authenticateBiometrics() async {
+    final ok = await BiometricService.authenticate(
+      'Usa la biometria per accedere al conto',
+    );
+    if (!mounted) return;
+
+    if (ok) {
+      context.read<AuthProvider>().loginWithPin('Bentornato');
+      _navigateToHome();
+    } else {
+      FocusScope.of(context).requestFocus(_pinFocusNode);
+    }
+  }
+
+  void _verifyPin() {
+    if (_pinController.text == _savedPin) {
+      HapticFeedback.lightImpact();
+      context.read<AuthProvider>().loginWithPin('Bentornato');
+      _navigateToHome();
+    } else {
+      HapticFeedback.heavyImpact();
+      setState(() {
+        _errorMessage = 'PIN errato. Riprova.';
+        _pinController.clear();
+      });
+      FocusScope.of(context).requestFocus(_pinFocusNode);
+    }
+  }
+
+  void _handleStandardLogin() async {
+    final username = _usernameController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (username.isEmpty || password.isEmpty) {
+      setState(() => _errorMessage = 'Inserisci username e password.');
+      return;
+    }
+
+    setState(() {
+      _errorMessage = null;
+      _isSubmitting = true;
+    });
+
+    final success = await context.read<AuthProvider>().login(
+      username,
+      password,
+    );
+
+    if (!mounted) return;
+    setState(() => _isSubmitting = false);
+
+    if (success) {
+      final newPin = await Navigator.push<String>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const SharedPinScreen(action: PinAction.setup),
+        ),
+      );
+
+      if (newPin != null && mounted) {
+        await StorageService.savePin(newPin);
+        await _promptBiometricsSetup();
+        _navigateToHome();
+      }
+    } else {
+      setState(() => _errorMessage = 'Credenziali non valide.');
+    }
+  }
+
+  Future<void> _promptBiometricsSetup() async {
+    final canCheck = await BiometricService.canCheckBiometrics();
+    if (!mounted || !canCheck) return;
+
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.fingerprint_rounded, size: 26),
+            SizedBox(width: 10),
+            Text('Accesso biometrico'),
+          ],
+        ),
+        content: const Text(
+          'Vuoi usare l\'impronta o Face ID per accedere più velocemente?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('No, grazie'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Attiva'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true) {
+      final ok = await BiometricService.authenticate(
+        'Conferma per abilitare la biometria',
+      );
+      await StorageService.setBiometrics(ok);
+    }
+  }
+
+  void _navigateToHome() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const MainLayout()),
+    );
+  }
+
+  void _switchToPasswordMode() {
+    setState(() {
+      _isPinMode = false;
+      _isPinPromptActive = false;
+      _errorMessage = null;
+      _pinController.clear();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     final themeProvider = Provider.of<ThemeProvider>(context);
-    // Utilizziamo la luminosità effettiva del tema risolto (che tiene conto del sistema se impostato su system)
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primary = Theme.of(context).colorScheme.primary;
 
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.transparent,
-        elevation: 0,
         actions: [
           IconButton(
-            icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode),
-            onPressed: () {
-              themeProvider.toggleTheme();
-            },
+            icon: Icon(
+              isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+            ),
+            tooltip: isDark ? 'Tema chiaro' : 'Tema scuro',
+            onPressed: themeProvider.toggleTheme,
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 4),
         ],
       ),
       extendBodyBehindAppBar: true,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Titolo
-              const Text(
-                'Banking App',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 36,
-                  fontWeight: FontWeight.w900,
-                  height: 1.1,
-                  letterSpacing: -1.0,
+        child: FadeTransition(
+          opacity: _fadeAnim,
+          child: SlideTransition(
+            position: _slideAnim,
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                  vertical: 24,
                 ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Gestisci le tue finanze',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
-              ),
-              const SizedBox(height: 48),
-              TextField(
-                controller: _usernameController,
-                decoration: InputDecoration(
-                  labelText: 'Nome Utente',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  prefixIcon: const Icon(Icons.person_outline),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _passwordController,
-                obscureText: _isPasswordObscured,
-                enableSuggestions: false,
-                autocorrect: false,
-                obscuringCharacter: '•',
-                keyboardType: TextInputType.visiblePassword,
-                decoration: InputDecoration(
-                  labelText: 'Password',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  prefixIcon: const Icon(Icons.lock_outline),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _isPasswordObscured
-                          ? Icons.visibility_off
-                          : Icons.visibility,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Design Tipografico Professionale (Allineato a sinistra)
+                    Text(
+                      'Benvenuto in',
+                      style: TextStyle(
+                        fontSize: 18,
+                        color: isDark
+                            ? const Color(0xFF9CA3AF)
+                            : const Color(0xFF6B7280),
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                    onPressed: () {
-                      setState(() {
-                        _isPasswordObscured = !_isPasswordObscured;
-                      });
-                    },
-                  ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'IoT Banking.',
+                      style: TextStyle(
+                        fontSize: 38,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -1,
+                        color: primary,
+                        height: 1.1,
+                      ),
+                    ),
+                    const SizedBox(height: 48),
+
+                    if (_isPinMode) ...[
+                      if (!_isPinPromptActive) ...[
+                        // SCHERMATA DI BENVENUTO (DORMIENTE)
+                        ElevatedButton.icon(
+                          onPressed: _startUnlockProcess,
+                          icon: const Icon(Icons.lock_open_rounded),
+                          label: const Text('Sblocca l\'app'),
+                        ),
+                        const SizedBox(height: 16),
+                        Center(
+                          child: TextButton(
+                            onPressed: _switchToPasswordMode,
+                            child: Text(
+                              'Accedi con un altro account',
+                              style: TextStyle(
+                                color: isDark
+                                    ? const Color(0xFF9CA3AF)
+                                    : const Color(0xFF6B7280),
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ] else ...[
+                        // INSERIMENTO PIN MANUALE
+                        Text(
+                          'Inserisci il PIN',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w500,
+                            color: isDark
+                                ? const Color(0xFF9CA3AF)
+                                : const Color(0xFF6B7280),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        PinBoxesInput(
+                          controller: _pinController,
+                          focusNode: _pinFocusNode,
+                          autofocus: !_useBiometrics,
+                          onChanged: (_) =>
+                              setState(() => _errorMessage = null),
+                        ),
+                        const SizedBox(height: 24),
+
+                        ElevatedButton(
+                          onPressed: _pinController.text.length == 6
+                              ? _verifyPin
+                              : null,
+                          child: const Text('Accedi'),
+                        ),
+
+                        if (_errorMessage != null) ...[
+                          const SizedBox(height: 16),
+                          _buildErrorBanner(),
+                        ],
+
+                        if (_useBiometrics) ...[
+                          const SizedBox(height: 12),
+                          Center(
+                            child: TextButton.icon(
+                              onPressed: _authenticateBiometrics,
+                              icon: const Icon(Icons.fingerprint, size: 24),
+                              label: const Text('Usa biometria'),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ] else ...[
+                      // SCHERMATA DI LOGIN CLASSICA
+                      TextField(
+                        controller: _usernameController,
+                        textInputAction: TextInputAction.next,
+                        decoration: const InputDecoration(
+                          labelText: 'Nome utente',
+                          prefixIcon: Icon(Icons.person_outline_rounded),
+                        ),
+                        onChanged: (_) => setState(() => _errorMessage = null),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: _passwordController,
+                        obscureText: _isPasswordObscured,
+                        enableSuggestions: false,
+                        autocorrect: false,
+                        textInputAction: TextInputAction.done,
+                        onSubmitted: (_) => _handleStandardLogin(),
+                        onChanged: (_) => setState(() => _errorMessage = null),
+                        decoration: InputDecoration(
+                          labelText: 'Password',
+                          prefixIcon: const Icon(Icons.lock_outline_rounded),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _isPasswordObscured
+                                  ? Icons.visibility_off_outlined
+                                  : Icons.visibility_outlined,
+                            ),
+                            onPressed: () => setState(
+                              () => _isPasswordObscured = !_isPasswordObscured,
+                            ),
+                          ),
+                        ),
+                      ),
+                      if (_errorMessage != null) ...[
+                        const SizedBox(height: 16),
+                        _buildErrorBanner(),
+                      ],
+                      const SizedBox(height: 32),
+                      ElevatedButton(
+                        onPressed: _isSubmitting ? null : _handleStandardLogin,
+                        child: _isSubmitting
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2.5,
+                                ),
+                              )
+                            : const Text('Accedi'),
+                      ),
+                    ],
+                  ],
                 ),
               ),
-              const SizedBox(height: 8),
-              if (_errorMessage != null)
-                Text(
-                  _errorMessage!,
-                  style: const TextStyle(
-                    color: Colors.red,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: _handleLogin,
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 54),
-                  backgroundColor: Theme.of(context).colorScheme.primary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text(
-                  'Accedi',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildErrorBanner() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFEF2F2),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFFCA5A5)),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.error_outline_rounded,
+            color: Color(0xFFDC2626),
+            size: 18,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              _errorMessage!,
+              style: const TextStyle(
+                color: Color(0xFFDC2626),
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

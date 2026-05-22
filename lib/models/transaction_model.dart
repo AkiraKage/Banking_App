@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 enum TransactionType { income, expense }
 
-// Categorie possibili
 enum TransactionCategory {
   shopping,
   transport,
@@ -25,7 +24,7 @@ class TransactionModel {
   final TransactionType type;
   final TransactionCategory category;
 
-  TransactionModel({
+  const TransactionModel({
     required this.title,
     required this.amount,
     required this.date,
@@ -33,49 +32,42 @@ class TransactionModel {
     required this.category,
   });
 
-  // Icona in base alla categoria
-  IconData get getIcon {
-    switch (category) {
-      case TransactionCategory.shopping:
-        return Icons.shopping_bag;
-      case TransactionCategory.transport:
-        return Icons.directions_car;
-      case TransactionCategory.food:
-        return Icons.restaurant;
-      case TransactionCategory.entertainment:
-        return Icons.movie;
-      case TransactionCategory.health:
-        return Icons.medical_services;
-      case TransactionCategory.travel:
-        return Icons.flight;
-      case TransactionCategory.utilities:
-        return Icons.bolt;
-      case TransactionCategory.salary:
-        return Icons.payments;
-      case TransactionCategory.transfer:
-        return Icons.sync_alt;
-      case TransactionCategory.education:
-        return Icons.school;
-      case TransactionCategory.subscriptions:
-        return Icons.subscriptions;
-      case TransactionCategory.other:
-        return Icons.more_horiz;
-    }
+  IconData get icon {
+    return switch (category) {
+      TransactionCategory.shopping => Icons.shopping_bag_outlined,
+      TransactionCategory.transport => Icons.directions_car_outlined,
+      TransactionCategory.food => Icons.restaurant_outlined,
+      TransactionCategory.entertainment => Icons.movie_outlined,
+      TransactionCategory.health => Icons.medical_services_outlined,
+      TransactionCategory.travel => Icons.flight_outlined,
+      TransactionCategory.utilities => Icons.bolt_outlined,
+      TransactionCategory.salary => Icons.payments_outlined,
+      TransactionCategory.transfer => Icons.sync_alt_rounded,
+      TransactionCategory.education => Icons.school_outlined,
+      TransactionCategory.subscriptions => Icons.subscriptions_outlined,
+      TransactionCategory.other => Icons.more_horiz_rounded,
+    };
   }
 
   String get formattedAmount {
-    String prefix = type == TransactionType.income ? '+' : '-';
-    return '$prefix € ${amount.toStringAsFixed(2)}';
+    final prefix = type == TransactionType.income ? '+' : '-';
+    return '$prefix€ ${amount.toStringAsFixed(2).replaceAll('.', ',')}';
   }
 
-  // Metodo rapido per formattare data e ora (es. "16/05/2026 - 14:30")
   String get formattedDate {
-    String day = date.day.toString().padLeft(2, '0');
-    String month = date.month.toString().padLeft(2, '0');
-    String year = date.year.toString();
-    String hour = date.hour.toString().padLeft(2, '0');
-    String minute = date.minute.toString().padLeft(2, '0');
+    final d = date.day.toString().padLeft(2, '0');
+    final m = date.month.toString().padLeft(2, '0');
+    final y = date.year.toString();
+    final h = date.hour.toString().padLeft(2, '0');
+    final min = date.minute.toString().padLeft(2, '0');
+    return '$d/$m/$y · $h:$min';
+  }
 
-    return '$day/$month/$year - $hour:$minute';
+  /// Ritorna solo la data (senza orario)
+  String get formattedDateOnly {
+    final d = date.day.toString().padLeft(2, '0');
+    final m = date.month.toString().padLeft(2, '0');
+    final y = date.year.toString();
+    return '$d/$m/$y';
   }
 }

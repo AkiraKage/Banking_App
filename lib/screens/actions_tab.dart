@@ -1,4 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
+import '../widgets/action_card.dart';
+import '../widgets/info_row.dart';
+import 'transfer_screen.dart';
+import 'qr_deposit_screen.dart';
 
 class ActionsTab extends StatelessWidget {
   const ActionsTab({super.key});
@@ -6,115 +12,80 @@ class ActionsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primary = Theme.of(context).colorScheme.primary;
+    final secondary = Theme.of(context).colorScheme.secondary;
+    final authProvider = Provider.of<AuthProvider>(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Operazioni',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
+        title: const Text('Operazioni'),
         automaticallyImplyLeading: false,
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16),
         children: [
-          _buildActionCard(
-            context,
-            'Bonifico Bancario',
-            'Trasferisci fondi verso un altro IBAN',
-            Icons.account_balance,
-            isDark,
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16, left: 2),
+            child: Text(
+              'Cosa vuoi fare?',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: isDark
+                    ? const Color(0xFF9CA3AF)
+                    : const Color(0xFF6B7280),
+              ),
+            ),
           ),
-          const SizedBox(height: 10), // Spazio tra card ridotto
-          _buildActionCard(
-            context,
-            'Giroconto',
-            'Sposta denaro tra i tuoi conti',
-            Icons.sync_alt,
-            isDark,
+          ActionCard(
+            title: 'Bonifico Bancario',
+            subtitle: 'Trasferisci denaro verso un IBAN',
+            icon: Icons.account_balance_rounded,
+            color: primary,
+            isDark: isDark,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const TransferScreen()),
+            ),
           ),
-          const SizedBox(height: 10), // Spazio tra card ridotto
-          _buildActionCard(
-            context,
-            'Ricarica Telefonica',
-            'Aggiungi credito al tuo smartphone',
-            Icons.phone_android,
-            isDark,
+          const SizedBox(height: 12),
+          ActionCard(
+            title: 'Versamento QR',
+            subtitle: 'Scansiona il QR dell\'esercente',
+            icon: Icons.qr_code_scanner_rounded,
+            color: secondary,
+            isDark: isDark,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const QrDepositScreen()),
+            ),
+          ),
+          const SizedBox(height: 28),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 14, left: 2),
+            child: Text(
+              'Info conto',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: isDark
+                    ? const Color(0xFF9CA3AF)
+                    : const Color(0xFF6B7280),
+              ),
+            ),
+          ),
+          InfoRow(
+            label: 'IBAN',
+            value: 'IT60 X054 2811 1010 0000 0123 456',
+            isDark: isDark,
+          ),
+          InfoRow(label: 'BIC/SWIFT', value: 'BLOKIT22', isDark: isDark),
+          InfoRow(
+            label: 'Intestatario',
+            value: '${authProvider.userName} Banking',
+            isDark: isDark,
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildActionCard(
-    BuildContext context,
-    String title,
-    String subtitle,
-    IconData icon,
-    bool isDark,
-  ) {
-    return Card(
-      elevation: 0,
-      color: isDark ? Colors.grey.shade900 : Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        // Uniformato ai 12px delle transazioni
-        side: BorderSide(
-          color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
-        ),
-      ),
-      child: InkWell(
-        onTap: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('$title in fase di sviluppo...')),
-          );
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.secondary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  icon,
-                  size: 24,
-                  color: Theme.of(context).colorScheme.secondary,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        color: Colors.grey.shade500,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(Icons.chevron_right, color: Colors.grey.shade400, size: 20),
-            ],
-          ),
-        ),
       ),
     );
   }
