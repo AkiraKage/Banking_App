@@ -31,12 +31,13 @@ class _LoginScreenState extends State<LoginScreen>
   bool _isPasswordObscured = true;
   bool _isLoading = true;
 
-  bool _isPinMode = false; // Se l'utente ha già configurato l'app
-  bool _isPinPromptActive = false; // Se l'utente ha cliccato "Sblocca l'app"
+  bool _isPinMode = false;
+  bool _isPinPromptActive = false;
 
   bool _isSubmitting = false;
   String? _savedPin;
   bool _useBiometrics = false;
+  String _savedDisplayName = 'Bentornato';
 
   @override
   void initState() {
@@ -71,6 +72,7 @@ class _LoginScreenState extends State<LoginScreen>
   Future<void> _checkInitialState() async {
     _savedPin = await StorageService.getPin();
     _useBiometrics = await StorageService.getBiometrics();
+    _savedDisplayName = await StorageService.getDisplayName() ?? 'Bentornato';
 
     if (!mounted) return;
 
@@ -80,7 +82,13 @@ class _LoginScreenState extends State<LoginScreen>
     });
 
     _animController.forward();
-    // NOTA: Non chiamiamo più la biometria qui. Aspettiamo l'interazione dell'utente.
+  }
+
+  Future<void> _completePinLogin() async {
+    final name = await StorageService.getDisplayName() ?? _savedDisplayName;
+    if (!mounted) return;
+    context.read<AuthProvider>().loginWithPin(name);
+    _navigateToHome();
   }
 
   void _startUnlockProcess() {
@@ -103,18 +111,16 @@ class _LoginScreenState extends State<LoginScreen>
     if (!mounted) return;
 
     if (ok) {
-      context.read<AuthProvider>().loginWithPin('Bentornato');
-      _navigateToHome();
+      await _completePinLogin();
     } else {
       FocusScope.of(context).requestFocus(_pinFocusNode);
     }
   }
 
-  void _verifyPin() {
+  Future<void> _verifyPin() async {
     if (_pinController.text == _savedPin) {
       HapticFeedback.lightImpact();
-      context.read<AuthProvider>().loginWithPin('Bentornato');
-      _navigateToHome();
+      await _completePinLogin();
     } else {
       HapticFeedback.heavyImpact();
       setState(() {
@@ -148,20 +154,28 @@ class _LoginScreenState extends State<LoginScreen>
     setState(() => _isSubmitting = false);
 
     if (success) {
-      final newPin = await Navigator.push<String>(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const SharedPinScreen(action: PinAction.setup),
-        ),
-      );
+      final existingPin = await StorageService.getPin();
+      if (existingPin == null) {
+        final newPin = await Navigator.push<String>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const SharedPinScreen(action: PinAction.setup),
+          ),
+        );
 
-      if (newPin != null && mounted) {
-        await StorageService.savePin(newPin);
-        await _promptBiometricsSetup();
+        if (newPin != null && mounted) {
+          await StorageService.savePin(newPin);
+          await _promptBiometricsSetup();
+          _navigateToHome();
+        }
+      } else {
         _navigateToHome();
       }
     } else {
-      setState(() => _errorMessage = 'Credenziali non valide.');
+      final providerError = context.read<AuthProvider>().lastError;
+      setState(
+        () => _errorMessage = providerError ?? 'Credenziali non valide.',
+      );
     }
   }
 
@@ -258,10 +272,8 @@ class _LoginScreenState extends State<LoginScreen>
                   vertical: 24,
                 ),
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Design Tipografico Professionale (Allineato a sinistra)
                     Text(
                       'Benvenuto in',
                       style: TextStyle(
@@ -284,14 +296,12 @@ class _LoginScreenState extends State<LoginScreen>
                       ),
                     ),
                     const SizedBox(height: 48),
-
                     if (_isPinMode) ...[
                       if (!_isPinPromptActive) ...[
-                        // SCHERMATA DI BENVENUTO (DORMIENTE)
                         ElevatedButton.icon(
                           onPressed: _startUnlockProcess,
                           icon: const Icon(Icons.lock_open_rounded),
-                          label: const Text('Sblocca l\'app'),
+                          label: Text('Sblocca $_savedDisplayName'),
                         ),
                         const SizedBox(height: 16),
                         Center(
@@ -309,7 +319,6 @@ class _LoginScreenState extends State<LoginScreen>
                           ),
                         ),
                       ] else ...[
-                        // INSERIMENTO PIN MANUALE
                         Text(
                           'Inserisci il PIN',
                           textAlign: TextAlign.center,
@@ -330,19 +339,16 @@ class _LoginScreenState extends State<LoginScreen>
                               setState(() => _errorMessage = null),
                         ),
                         const SizedBox(height: 24),
-
                         ElevatedButton(
                           onPressed: _pinController.text.length == 6
                               ? _verifyPin
                               : null,
                           child: const Text('Accedi'),
                         ),
-
                         if (_errorMessage != null) ...[
                           const SizedBox(height: 16),
                           _buildErrorBanner(),
                         ],
-
                         if (_useBiometrics) ...[
                           const SizedBox(height: 12),
                           Center(
@@ -355,7 +361,6 @@ class _LoginScreenState extends State<LoginScreen>
                         ],
                       ],
                     ] else ...[
-                      // SCHERMATA DI LOGIN CLASSICA
                       TextField(
                         controller: _usernameController,
                         textInputAction: TextInputAction.next,

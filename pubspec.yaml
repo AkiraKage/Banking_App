@@ -42,6 +42,7 @@ dependencies:
   nfc_manager: ^4.2.1
   local_auth: ^3.0.1
   app_settings: ^7.0.0
+  flutter_dotenv: ^6.0.1
 
 dev_dependencies:
   flutter_test:

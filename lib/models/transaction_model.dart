@@ -32,6 +32,43 @@ class TransactionModel {
     required this.category,
   });
 
+  factory TransactionModel.fromJson(Map<String, dynamic> json) {
+    final typeRaw = (json['type'] ?? 'expense').toString().toLowerCase();
+    final catRaw = (json['category'] ?? 'other').toString().toLowerCase();
+
+    final tType = typeRaw == 'income'
+        ? TransactionType.income
+        : TransactionType.expense;
+    final tCategory = switch (catRaw) {
+      'shopping' => TransactionCategory.shopping,
+      'transport' => TransactionCategory.transport,
+      'food' => TransactionCategory.food,
+      'entertainment' => TransactionCategory.entertainment,
+      'health' => TransactionCategory.health,
+      'travel' => TransactionCategory.travel,
+      'utilities' => TransactionCategory.utilities,
+      'salary' => TransactionCategory.salary,
+      'transfer' => TransactionCategory.transfer,
+      'education' => TransactionCategory.education,
+      'subscriptions' => TransactionCategory.subscriptions,
+      _ => TransactionCategory.other,
+    };
+
+    final amountRaw = json['amount'];
+    final parsedAmount = amountRaw is num
+        ? amountRaw.toDouble()
+        : double.tryParse(amountRaw.toString()) ?? 0.0;
+
+    return TransactionModel(
+      title: (json['title'] ?? 'Transazione').toString(),
+      amount: parsedAmount.abs(),
+      date:
+          DateTime.tryParse((json['date'] ?? '').toString()) ?? DateTime.now(),
+      type: tType,
+      category: tCategory,
+    );
+  }
+
   IconData get icon {
     return switch (category) {
       TransactionCategory.shopping => Icons.shopping_bag_outlined,
@@ -63,7 +100,6 @@ class TransactionModel {
     return '$d/$m/$y · $h:$min';
   }
 
-  /// Ritorna solo la data (senza orario)
   String get formattedDateOnly {
     final d = date.day.toString().padLeft(2, '0');
     final m = date.month.toString().padLeft(2, '0');

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../services/api_service.dart';
+import '../services/app_events.dart';
 
 class TransferScreen extends StatefulWidget {
   const TransferScreen({super.key});
@@ -28,7 +30,7 @@ class _TransferScreenState extends State<TransferScreen> {
 
   String? _validateIban(String? v) {
     if (v == null || v.trim().isEmpty) return 'Campo obbligatorio';
-    final cleaned = v.replaceAll(' ', '');
+    final cleaned = v.replaceAll(' ', '').toUpperCase();
     if (cleaned.length < 15) return 'IBAN non valido';
     return null;
   }
@@ -44,12 +46,8 @@ class _TransferScreenState extends State<TransferScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isLoading = true);
-    await Future.delayed(const Duration(seconds: 2));
-    if (!mounted) return;
-    setState(() => _isLoading = false);
+    final amount = double.parse(_amountCtrl.text.replaceAll(',', '.'));
 
-    // Conferma finale
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -66,9 +64,11 @@ class _TransferScreenState extends State<TransferScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _ConfirmRow(label: 'Beneficiario', value: _beneficiaryCtrl.text),
+            _ConfirmRow(label: 'IBAN', value: _ibanCtrl.text),
             _ConfirmRow(
-                label: 'Importo',
-                value: '€ ${double.parse(_amountCtrl.text.replaceAll(',', '.')).toStringAsFixed(2)}'),
+              label: 'Importo',
+              value: '€ ${amount.toStringAsFixed(2).replaceAll('.', ',')}',
+            ),
             _ConfirmRow(label: 'Causale', value: _causaleCtrl.text),
           ],
         ),
@@ -85,21 +85,48 @@ class _TransferScreenState extends State<TransferScreen> {
       ),
     );
 
-    if (confirmed == true && mounted) {
+    if (confirmed != true) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      await ApiService.createTransfer(
+        beneficiary: _beneficiaryCtrl.text.trim(),
+        iban: _ibanCtrl.text.trim(),
+        amount: amount,
+        reason: _causaleCtrl.text.trim(),
+      );
+
+      AppEvents.emitAccountDataChanged();
+
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Row(
+        const SnackBar(
+          content: Row(
             children: [
-              Icon(Icons.check_circle_outline_rounded,
-                  color: Colors.white, size: 18),
+              Icon(
+                Icons.check_circle_outline_rounded,
+                color: Colors.white,
+                size: 18,
+              ),
               SizedBox(width: 10),
               Text('Bonifico inviato con successo!'),
             ],
           ),
-          backgroundColor: const Color(0xFF059669),
+          backgroundColor: Color(0xFF059669),
         ),
       );
       Navigator.pop(context);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString()),
+          backgroundColor: const Color(0xFFDC2626),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -142,8 +169,9 @@ class _TransferScreenState extends State<TransferScreen> {
             const SizedBox(height: 6),
             TextFormField(
               controller: _amountCtrl,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               textInputAction: TextInputAction.next,
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'[0-9,.]')),
@@ -168,8 +196,9 @@ class _TransferScreenState extends State<TransferScreen> {
                   child: Icon(Icons.edit_note_rounded),
                 ),
               ),
-              validator: (v) =>
-                  v == null || v.trim().isEmpty ? 'Inserisci una causale' : null,
+              validator: (v) => v == null || v.trim().isEmpty
+                  ? 'Inserisci una causale'
+                  : null,
             ),
             const SizedBox(height: 32),
             ElevatedButton(
@@ -179,7 +208,9 @@ class _TransferScreenState extends State<TransferScreen> {
                       height: 20,
                       width: 20,
                       child: CircularProgressIndicator(
-                          color: Colors.white, strokeWidth: 2.5),
+                        color: Colors.white,
+                        strokeWidth: 2.5,
+                      ),
                     )
                   : const Text('Invia Bonifico'),
             ),
@@ -192,6 +223,7 @@ class _TransferScreenState extends State<TransferScreen> {
 
 class _FieldLabel extends StatelessWidget {
   final String text;
+
   const _FieldLabel(this.text);
 
   @override
@@ -206,6 +238,7 @@ class _FieldLabel extends StatelessWidget {
 class _ConfirmRow extends StatelessWidget {
   final String label;
   final String value;
+
   const _ConfirmRow({required this.label, required this.value});
 
   @override
@@ -217,16 +250,20 @@ class _ConfirmRow extends StatelessWidget {
         children: [
           SizedBox(
             width: 90,
-            child: Text(label,
-                style: const TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF6B7280),
-                    fontWeight: FontWeight.w500)),
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 13,
+                color: Color(0xFF6B7280),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ),
           Expanded(
-            child: Text(value,
-                style: const TextStyle(
-                    fontSize: 13, fontWeight: FontWeight.w600)),
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
           ),
         ],
       ),
