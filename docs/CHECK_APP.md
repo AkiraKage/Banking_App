@@ -4,20 +4,20 @@ Guida rapida per verificare configurazione e collegamenti dell'app.
 
 ## 1) Posizionati nella root del repo app
 
-```
-cd <repo-app>
+```bash
+cd Banking_App
 ```
 
 ## 2) Verifica script check presente
 
+```bash
+ls check_test.py
 ```
-ls check_android_repo.py
-``` 
 
 ## 3) Verifica base (struttura + env + wiring + manifest)
 
-```
-python check_android_repo.py
+```bash
+python check_test.py
 ```
 
 ## 4) Check con reachability backend (facoltativo)
@@ -26,14 +26,14 @@ Se hai già `.env` con `API_BASE_URL` valido, lo script proverà anche `/api/hea
 
 Esempio `.env`:
 
+```dotenv
+API_BASE_URL=[https://abc12345.ngrok-free.app]
 ```
-dotenv API_BASE_URL=https://abc12345.ngrok-free.app
-``` 
 
 Poi rilancia:
 
-```
-python check_android_repo.py
+```bash
+python check_test.py
 ```
 
 ## 5) Interpretazione risultato

@@ -19,7 +19,7 @@ class HomeTab extends StatefulWidget {
   State<HomeTab> createState() => _HomeTabState();
 }
 
-class _HomeTabState extends State<HomeTab> {
+class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
   bool _balanceVisible = true;
   bool _loading = true;
   String? _error;
@@ -28,24 +28,63 @@ class _HomeTabState extends State<HomeTab> {
   double _incomeMonth = 0.0;
   double _expenseMonth = 0.0;
   List<TransactionModel> _transactions = const [];
+  MeData? _me;
 
   StreamSubscription<AppEvent>? _eventsSub;
+  Timer? _pollTimer;
+
+  // Polling ogni 30s per riflettere pagamenti POS fisici (caso missing 1)
+  static const _pollInterval = Duration(seconds: 30);
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadDashboard();
     _eventsSub = AppEvents.stream.listen((event) {
       if (event == AppEvent.accountDataChanged) {
         _loadDashboard();
       }
     });
+    _startPolling();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _eventsSub?.cancel();
+    _pollTimer?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _startPolling();
+      _loadDashboard();
+    } else {
+      _pollTimer?.cancel();
+    }
+  }
+
+  void _startPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(_pollInterval, (_) => _silentRefresh());
+  }
+
+  /// Refresh in background: non mostra loader, ignora errori per non disturbare l'utente.
+  Future<void> _silentRefresh() async {
+    try {
+      final balanceData = await ApiService.getBalance();
+      final txs = await ApiService.getTransactions();
+      if (!mounted) return;
+      setState(() {
+        _balance = balanceData.balance;
+        _incomeMonth = balanceData.incomeMonth;
+        _expenseMonth = balanceData.expenseMonth;
+        _transactions = txs;
+      });
+    } catch (_) {}
   }
 
   Future<void> _loadDashboard() async {
@@ -57,8 +96,15 @@ class _HomeTabState extends State<HomeTab> {
     }
 
     try {
-      final balanceData = await ApiService.getBalance();
-      final txs = await ApiService.getTransactions();
+      final results = await Future.wait([
+        ApiService.getBalance(),
+        ApiService.getTransactions(),
+        ApiService.getMe(),
+      ]);
+
+      final balanceData = results[0] as BalanceData;
+      final txs = results[1] as List<TransactionModel>;
+      final me = results[2] as MeData;
 
       if (!mounted) return;
       setState(() {
@@ -66,6 +112,7 @@ class _HomeTabState extends State<HomeTab> {
         _incomeMonth = balanceData.incomeMonth;
         _expenseMonth = balanceData.expenseMonth;
         _transactions = txs;
+        _me = me;
       });
     } catch (e) {
       if (!mounted) return;
@@ -76,6 +123,12 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   Future<void> _onRefresh() => _loadDashboard();
+
+  String _lastFour() {
+    final iban = _me?.iban ?? '';
+    if (iban.length < 4) return '0000';
+    return iban.substring(iban.length - 4);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -88,6 +141,8 @@ class _HomeTabState extends State<HomeTab> {
       ..sort((a, b) => b.date.compareTo(a.date));
     final recent = sorted.take(8).toList();
     final hasMore = sorted.length > 8;
+
+    final cardholder = (_me?.name ?? authProvider.userName).toUpperCase();
 
     return Scaffold(
       appBar: AppBar(
@@ -145,6 +200,8 @@ class _HomeTabState extends State<HomeTab> {
                   BankCard(
                     balance: _balance,
                     balanceVisible: _balanceVisible,
+                    cardholderName: cardholder,
+                    lastFour: _lastFour(),
                     onToggleVisibility: () =>
                         setState(() => _balanceVisible = !_balanceVisible),
                     onTap: () => Navigator.push(

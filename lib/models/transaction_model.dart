@@ -88,7 +88,7 @@ class TransactionModel {
 
   String get formattedAmount {
     final prefix = type == TransactionType.income ? '+' : '-';
-    return '$prefix€ ${amount.toStringAsFixed(2).replaceAll('.', ',')}';
+    return '$prefix €${amount.toStringAsFixed(2).replaceAll('.', ',')}';
   }
 
   String get formattedDate {

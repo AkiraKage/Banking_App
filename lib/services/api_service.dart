@@ -33,8 +33,40 @@ class QrDetails {
   const QrDetails({required this.amount, required this.merchantName});
 }
 
+class MeData {
+  final int id;
+  final String name;
+  final String username;
+  final double balance;
+  final String iban;
+  final bool cardActive;
+
+  const MeData({
+    required this.id,
+    required this.name,
+    required this.username,
+    required this.balance,
+    required this.iban,
+    required this.cardActive,
+  });
+}
+
 class ApiService {
   static const Duration _timeout = Duration(seconds: 15);
+
+  /// Header base condivisi da tutte le richieste.
+  /// `ngrok-skip-browser-warning` evita l'interstitial HTML di ngrok free
+  /// che romperebbe il parsing JSON al primo accesso.
+  static Map<String, String> get _baseHeaders => {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    'ngrok-skip-browser-warning': 'true',
+  };
+
+  static Map<String, String> _authHeaders(String token) => {
+    ..._baseHeaders,
+    'Authorization': 'Bearer $token',
+  };
 
   static String get baseUrl {
     final envUrl = dotenv.env['API_BASE_URL']?.trim();
@@ -59,8 +91,12 @@ class ApiService {
 
   static Future<Map<String, dynamic>> _decodeResponse(http.Response res) async {
     if (res.body.isEmpty) return {};
-    final decoded = jsonDecode(res.body);
-    if (decoded is Map<String, dynamic>) return decoded;
+    try {
+      final decoded = jsonDecode(res.body);
+      if (decoded is Map<String, dynamic>) return decoded;
+    } catch (_) {
+      // Risposta non JSON (es. interstitial HTML): la trattiamo come vuota
+    }
     return {};
   }
 
@@ -71,7 +107,7 @@ class ApiService {
     final res = await http
         .post(
           _uri('/api/refresh'),
-          headers: {'Content-Type': 'application/json'},
+          headers: _baseHeaders,
           body: jsonEncode({'refresh_token': refresh}),
         )
         .timeout(_timeout);
@@ -129,7 +165,7 @@ class ApiService {
     final res = await http
         .post(
           _uri('/api/login'),
-          headers: {'Content-Type': 'application/json'},
+          headers: _baseHeaders,
           body: jsonEncode({'username': username, 'password': password}),
         )
         .timeout(_timeout);
@@ -153,10 +189,7 @@ class ApiService {
         await http
             .post(
               _uri('/api/logout'),
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer $token',
-              },
+              headers: _authHeaders(token),
               body: jsonEncode({'refresh_token': refresh}),
             )
             .timeout(_timeout);
@@ -164,15 +197,33 @@ class ApiService {
     }
   }
 
+  static Future<MeData> getMe() async {
+    final res = await _authedRequest((token) {
+      return http.get(_uri('/api/me'), headers: _authHeaders(token));
+    });
+
+    final data = await _decodeResponse(res);
+    if (res.statusCode >= 400) {
+      throw ApiException(
+        data['message']?.toString() ?? 'Errore profilo',
+        statusCode: res.statusCode,
+      );
+    }
+    return MeData(
+      id: (data['id'] is num)
+          ? (data['id'] as num).toInt()
+          : int.tryParse(data['id'].toString()) ?? 0,
+      name: (data['name'] ?? '').toString(),
+      username: (data['username'] ?? '').toString(),
+      balance: _toDouble(data['balance']),
+      iban: (data['iban'] ?? '').toString(),
+      cardActive: data['card_active'] == true,
+    );
+  }
+
   static Future<BalanceData> getBalance() async {
     final res = await _authedRequest((token) {
-      return http.get(
-        _uri('/api/balance'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
+      return http.get(_uri('/api/balance'), headers: _authHeaders(token));
     });
 
     if (res.statusCode >= 400) {
@@ -193,13 +244,7 @@ class ApiService {
 
   static Future<List<TransactionModel>> getTransactions() async {
     final res = await _authedRequest((token) {
-      return http.get(
-        _uri('/api/transactions'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
+      return http.get(_uri('/api/transactions'), headers: _authHeaders(token));
     });
 
     if (res.statusCode >= 400) {
@@ -218,13 +263,7 @@ class ApiService {
 
   static Future<QrDetails> getQrDetails(String qrToken) async {
     final res = await _authedRequest((token) {
-      return http.get(
-        _uri('/api/qr/$qrToken'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
+      return http.get(_uri('/api/qr/$qrToken'), headers: _authHeaders(token));
     });
 
     final data = await _decodeResponse(res);
@@ -245,10 +284,7 @@ class ApiService {
     final res = await _authedRequest((token) {
       return http.post(
         _uri('/api/qr/confirm'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
+        headers: _authHeaders(token),
         body: jsonEncode({'qr_token': qrToken}),
       );
     });
@@ -272,10 +308,7 @@ class ApiService {
     final res = await _authedRequest((token) {
       return http.post(
         _uri('/api/transfer'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
+        headers: _authHeaders(token),
         body: jsonEncode({
           'beneficiary': beneficiary,
           'iban': iban,
@@ -303,10 +336,7 @@ class ApiService {
     final res = await _authedRequest((token) {
       return http.post(
         _uri('/api/nfc/pay'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
+        headers: _authHeaders(token),
         body: jsonEncode({
           'nfc_token': nfcToken,
           'merchant_name': merchantName,

@@ -6,6 +6,8 @@ class BankCard extends StatelessWidget {
   final VoidCallback onToggleVisibility;
   final VoidCallback onTap;
   final bool isDark;
+  final String cardholderName;
+  final String lastFour;
 
   const BankCard({
     super.key,
@@ -14,6 +16,8 @@ class BankCard extends StatelessWidget {
     required this.onToggleVisibility,
     required this.onTap,
     required this.isDark,
+    required this.cardholderName,
+    required this.lastFour,
   });
 
   @override
@@ -21,6 +25,11 @@ class BankCard extends StatelessWidget {
     final gradientColors = isDark
         ? [const Color(0xFF1E3A8A), const Color(0xFF1E40AF)]
         : [const Color(0xFF1A56DB), const Color(0xFF1D4ED8)];
+
+    final displayName = cardholderName.isEmpty
+        ? '—'
+        : cardholderName.toUpperCase();
+    final displayLast = lastFour.isEmpty ? '0000' : lastFour;
 
     return Card(
       elevation: 12,
@@ -116,9 +125,9 @@ class BankCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              const Text(
-                '4532  ••••  ••••  3456',
-                style: TextStyle(
+              Text(
+                '••••  ••••  ••••  $displayLast',
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
@@ -129,20 +138,23 @@ class BankCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'ALOK',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1.5,
+                  Expanded(
+                    child: Text(
+                      displayName,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.2,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   const Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        'SCADENZA',
+                        'POS IoT',
                         style: TextStyle(
                           color: Colors.white54,
                           fontSize: 8,
@@ -150,10 +162,10 @@ class BankCard extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        '12/30',
+                        'CONTACTLESS',
                         style: TextStyle(
                           color: Colors.white70,
-                          fontSize: 13,
+                          fontSize: 11,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
