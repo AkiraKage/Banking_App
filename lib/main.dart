@@ -10,11 +10,8 @@ import 'screens/login_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  try {
-    await dotenv.load(fileName: '.env');
-  } catch (_) {
-    // Fallback: ApiService userà default / dart-define se .env non è presente
-  }
+  // Carica il file .env con l'URL del backend
+  await dotenv.load(fileName: ".env");
 
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
