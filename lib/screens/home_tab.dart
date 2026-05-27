@@ -10,7 +10,6 @@ import '../widgets/bank_card.dart';
 import '../widgets/monthly_summary.dart';
 import '../widgets/transaction_tile.dart';
 import 'transactions_history_screen.dart';
-import 'card_nfc_screen.dart';
 
 class HomeTab extends StatefulWidget {
   const HomeTab({super.key});
@@ -33,7 +32,6 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
   StreamSubscription<AppEvent>? _eventsSub;
   Timer? _pollTimer;
 
-  // Polling ogni 30s per riflettere pagamenti POS fisici (caso missing 1)
   static const _pollInterval = Duration(seconds: 30);
 
   @override
@@ -72,7 +70,6 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
     _pollTimer = Timer.periodic(_pollInterval, (_) => _silentRefresh());
   }
 
-  /// Refresh in background: non mostra loader, ignora errori per non disturbare l'utente.
   Future<void> _silentRefresh() async {
     try {
       final balanceData = await ApiService.getBalance();
@@ -202,40 +199,12 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
                     balanceVisible: _balanceVisible,
                     cardholderName: cardholder,
                     lastFour: _lastFour(),
+                    iban: _me?.iban ?? authProvider.userIban,
                     onToggleVisibility: () =>
                         setState(() => _balanceVisible = !_balanceVisible),
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const CardNfcScreen()),
-                    ),
                     isDark: isDark,
                   ),
-                  const SizedBox(height: 8),
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.touch_app_outlined,
-                          size: 12,
-                          color: isDark
-                              ? const Color(0xFF6B7280)
-                              : const Color(0xFF9CA3AF),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Tocca per pagare contactless',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isDark
-                                ? const Color(0xFF6B7280)
-                                : const Color(0xFF9CA3AF),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  const SizedBox(height: 24),
                   MonthlySummaryRow(
                     income: _incomeMonth,
                     expense: _expenseMonth,

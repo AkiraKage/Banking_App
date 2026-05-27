@@ -72,9 +72,9 @@ class ApiService {
     final raw = (envUrl != null && envUrl.isNotEmpty)
         ? envUrl
         : const String.fromEnvironment(
-      'API_BASE_URL',
-      defaultValue: 'http://10.0.2.2:5000',
-    );
+            'API_BASE_URL',
+            defaultValue: 'http://10.0.2.2:5000',
+          );
     return raw.endsWith('/') ? raw.substring(0, raw.length - 1) : raw;
   }
 
@@ -88,9 +88,7 @@ class ApiService {
     return double.tryParse(v.toString()) ?? 0.0;
   }
 
-  static Future<Map<String, dynamic>> _decodeResponse(
-      http.Response res,
-      ) async {
+  static Future<Map<String, dynamic>> _decodeResponse(http.Response res) async {
     if (res.body.isEmpty) return {};
     try {
       final decoded = jsonDecode(res.body);
@@ -107,10 +105,10 @@ class ApiService {
 
     final res = await http
         .post(
-      _uri('/api/refresh'),
-      headers: _baseHeaders,
-      body: jsonEncode({'refresh_token': refresh}),
-    )
+          _uri('/api/refresh'),
+          headers: _baseHeaders,
+          body: jsonEncode({'refresh_token': refresh}),
+        )
         .timeout(_timeout);
 
     if (res.statusCode >= 400) return false;
@@ -127,8 +125,8 @@ class ApiService {
   }
 
   static Future<http.Response> _authedRequest(
-      Future<http.Response> Function(String token) request,
-      ) async {
+    Future<http.Response> Function(String token) request,
+  ) async {
     final token = await StorageService.getAuthToken();
     if (token == null || token.isEmpty) {
       throw ApiException('Sessione non valida. Effettua il login.');
@@ -165,10 +163,10 @@ class ApiService {
   }) async {
     final res = await http
         .post(
-      _uri('/api/login'),
-      headers: _baseHeaders,
-      body: jsonEncode({'username': username, 'password': password}),
-    )
+          _uri('/api/login'),
+          headers: _baseHeaders,
+          body: jsonEncode({'username': username, 'password': password}),
+        )
         .timeout(_timeout);
 
     final data = await _decodeResponse(res);
@@ -189,10 +187,10 @@ class ApiService {
       try {
         await http
             .post(
-          _uri('/api/logout'),
-          headers: _authHeaders(token),
-          body: jsonEncode({'refresh_token': refresh}),
-        )
+              _uri('/api/logout'),
+              headers: _authHeaders(token),
+              body: jsonEncode({'refresh_token': refresh}),
+            )
             .timeout(_timeout);
       } catch (_) {}
     }
@@ -264,10 +262,7 @@ class ApiService {
 
   static Future<QrDetails> getQrDetails(String qrToken) async {
     final res = await _authedRequest((token) {
-      return http.get(
-        _uri('/api/qr/$qrToken'),
-        headers: _authHeaders(token),
-      );
+      return http.get(_uri('/api/qr/$qrToken'), headers: _authHeaders(token));
     });
 
     final data = await _decodeResponse(res);
@@ -326,33 +321,6 @@ class ApiService {
     if (res.statusCode >= 400 || data['success'] != true) {
       throw ApiException(
         data['message']?.toString() ?? 'Bonifico fallito',
-        statusCode: res.statusCode,
-      );
-    }
-    return data;
-  }
-
-  static Future<Map<String, dynamic>> nfcPay({
-    required String nfcToken,
-    required String merchantName,
-    required double amount,
-  }) async {
-    final res = await _authedRequest((token) {
-      return http.post(
-        _uri('/api/nfc/pay'),
-        headers: _authHeaders(token),
-        body: jsonEncode({
-          'nfc_token': nfcToken,
-          'merchant_name': merchantName,
-          'amount': amount,
-        }),
-      );
-    });
-
-    final data = await _decodeResponse(res);
-    if (res.statusCode >= 400 || data['success'] != true) {
-      throw ApiException(
-        data['message']?.toString() ?? 'Pagamento NFC fallito',
         statusCode: res.statusCode,
       );
     }

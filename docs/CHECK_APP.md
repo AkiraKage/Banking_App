@@ -46,5 +46,5 @@ python check_test.py
 
 - `.env` mancante o `API_BASE_URL` placeholder
 - `main.dart` non carica `.env`
-- Manifest senza permessi rete/camera/NFC
+- Manifest senza permessi rete/camera
 - endpoint mancanti in `api_service.dart`
