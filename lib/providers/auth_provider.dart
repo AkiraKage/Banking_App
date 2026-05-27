@@ -5,12 +5,12 @@ import '../services/storage_service.dart';
 class AuthProvider with ChangeNotifier {
   bool _isAuthenticated = false;
   String _userName = 'Ospite';
+  String _userIban = '';
   String? _lastError;
 
   bool get isAuthenticated => _isAuthenticated;
-
   String get userName => _userName;
-
+  String get userIban => _userIban;
   String? get lastError => _lastError;
 
   Future<bool> login(String username, String password) async {
@@ -31,6 +31,16 @@ class AuthProvider with ChangeNotifier {
       await StorageService.saveDisplayName(name);
       await StorageService.saveUserId((user['id'] ?? '').toString());
 
+      // Recupera IBAN reale dal server
+      try {
+        final me = await ApiService.getMe();
+        final iban = (me['iban'] ?? '').toString();
+        await StorageService.saveIban(iban);
+        _userIban = iban;
+      } catch (_) {
+        _userIban = '';
+      }
+
       _isAuthenticated = true;
       _userName = name;
       notifyListeners();
@@ -44,10 +54,12 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  void loginWithPin(String savedName) {
+  Future<void> loginWithPin(String savedName) async {
     _isAuthenticated = true;
     _userName = savedName;
     _lastError = null;
+    // Recupera IBAN salvato localmente (già scaricato al primo login)
+    _userIban = (await StorageService.getIban()) ?? '';
     notifyListeners();
   }
 
@@ -62,6 +74,7 @@ class AuthProvider with ChangeNotifier {
 
     _isAuthenticated = false;
     _userName = 'Ospite';
+    _userIban = '';
     _lastError = null;
     notifyListeners();
   }

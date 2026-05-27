@@ -324,4 +324,25 @@ class ApiService {
     }
     return data;
   }
+  static Future<Map<String, dynamic>> getMe() async {
+    final res = await _authedRequest((token) {
+      return http.get(
+        _uri('/api/me'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+          'ngrok-skip-browser-warning': 'true',
+        },
+      );
+    });
+
+    if (res.statusCode >= 400) {
+      final data = await _decodeResponse(res);
+      throw ApiException(
+        data['message']?.toString() ?? 'Errore profilo',
+        statusCode: res.statusCode,
+      );
+    }
+    return await _decodeResponse(res);
+  }
 }

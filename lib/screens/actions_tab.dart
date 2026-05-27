@@ -9,12 +9,27 @@ import 'qr_deposit_screen.dart';
 class ActionsTab extends StatelessWidget {
   const ActionsTab({super.key});
 
+  // Formatta IBAN in gruppi di 4 per leggibilità
+  String _formatIban(String iban) {
+    final clean = iban.replaceAll(' ', '');
+    final buffer = StringBuffer();
+    for (int i = 0; i < clean.length; i++) {
+      if (i > 0 && i % 4 == 0) buffer.write(' ');
+      buffer.write(clean[i]);
+    }
+    return buffer.toString();
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primary = Theme.of(context).colorScheme.primary;
     final secondary = Theme.of(context).colorScheme.secondary;
     final authProvider = Provider.of<AuthProvider>(context);
+
+    final ibanDisplay = authProvider.userIban.isNotEmpty
+        ? _formatIban(authProvider.userIban)
+        : 'Caricamento...';
 
     return Scaffold(
       appBar: AppBar(
@@ -74,11 +89,7 @@ class ActionsTab extends StatelessWidget {
               ),
             ),
           ),
-          InfoRow(
-            label: 'IBAN',
-            value: 'IT60 X054 2811 1010 0000 0123 456',
-            isDark: isDark,
-          ),
+          InfoRow(label: 'IBAN', value: ibanDisplay, isDark: isDark),
           InfoRow(label: 'BIC/SWIFT', value: 'BLOKIT22', isDark: isDark),
           InfoRow(
             label: 'Intestatario',

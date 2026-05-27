@@ -7,4 +7,5 @@ abstract final class StorageKeys {
   static const String refreshToken = 'refresh_token';
   static const String userDisplayName = 'user_display_name';
   static const String userId = 'user_id';
+  static const String userIban = 'user_iban';
 }
