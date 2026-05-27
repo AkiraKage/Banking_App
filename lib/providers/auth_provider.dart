@@ -31,12 +31,11 @@ class AuthProvider with ChangeNotifier {
       await StorageService.saveDisplayName(name);
       await StorageService.saveUserId((user['id'] ?? '').toString());
 
-      // Recupera IBAN reale dal server
+      // Recupera IBAN reale da /api/me
       try {
         final me = await ApiService.getMe();
-        final iban = (me['iban'] ?? '').toString();
-        await StorageService.saveIban(iban);
-        _userIban = iban;
+        await StorageService.saveIban(me.iban);
+        _userIban = me.iban;
       } catch (_) {
         _userIban = '';
       }
@@ -58,7 +57,7 @@ class AuthProvider with ChangeNotifier {
     _isAuthenticated = true;
     _userName = savedName;
     _lastError = null;
-    // Recupera IBAN salvato localmente (già scaricato al primo login)
+    // IBAN gia salvato localmente al primo login
     _userIban = (await StorageService.getIban()) ?? '';
     notifyListeners();
   }

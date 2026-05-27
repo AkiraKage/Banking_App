@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:nfc_manager/nfc_manager.dart';
 import 'package:app_settings/app_settings.dart';
+import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../services/app_events.dart';
 
@@ -18,6 +21,9 @@ class _CardNfcScreenState extends State<CardNfcScreen>
   bool _nfcAvailable = false;
   bool _isCheckingNfc = true;
 
+  MeData? _me;
+  double? _pendingAmount;
+
   late final AnimationController _pulseController;
   late final Animation<double> _pulseAnim;
 
@@ -34,6 +40,7 @@ class _CardNfcScreenState extends State<CardNfcScreen>
     );
 
     _checkNfc();
+    _loadMe();
   }
 
   @override
@@ -41,6 +48,16 @@ class _CardNfcScreenState extends State<CardNfcScreen>
     _pulseController.dispose();
     NfcManager.instance.stopSession();
     super.dispose();
+  }
+
+  Future<void> _loadMe() async {
+    try {
+      final me = await ApiService.getMe();
+      if (!mounted) return;
+      setState(() => _me = me);
+    } catch (_) {
+      // Se /api/me fallisce, la UI mostra placeholder ma il pagamento funziona comunque
+    }
   }
 
   Future<void> _checkNfc() async {
@@ -57,6 +74,127 @@ class _CardNfcScreenState extends State<CardNfcScreen>
     return data.hashCode.toString();
   }
 
+  /// Ultime 4 cifre dell'IBAN, oppure "0000" se non disponibile.
+  String _lastFourFromIban() {
+    final iban = _me?.iban ?? '';
+    if (iban.length < 4) return '0000';
+    return iban.substring(iban.length - 4);
+  }
+
+  String _cardholderName() {
+    final raw = _me?.name ?? context.read<AuthProvider>().userName;
+    return raw.toUpperCase();
+  }
+
+  /// Mostra un bottom sheet per scegliere l'importo da pagare via NFC.
+  Future<double?> _askAmount() async {
+    final ctrl = TextEditingController();
+    String? error;
+
+    return showModalBottomSheet<double>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+          ),
+          child: StatefulBuilder(
+            builder: (ctx, setLocal) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Center(
+                    child: SizedBox(
+                      width: 40,
+                      height: 4,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Color(0xFFD1D5DB),
+                          borderRadius: BorderRadius.all(Radius.circular(2)),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  const Text(
+                    'Importo da pagare',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Inserisci la cifra che vuoi addebitare sulla tua carta.',
+                    style: TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: ctrl,
+                    autofocus: true,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[0-9,.]')),
+                    ],
+                    decoration: InputDecoration(
+                      hintText: '0,00',
+                      prefixIcon: const Icon(Icons.euro_rounded),
+                      errorText: error,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size(0, 48),
+                          ),
+                          child: const Text('Annulla'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            final raw = ctrl.text.replaceAll(',', '.').trim();
+                            final value = double.tryParse(raw);
+                            if (value == null || value <= 0) {
+                              setLocal(() => error = 'Importo non valido');
+                              return;
+                            }
+                            if (value > 9999999) {
+                              setLocal(() => error = 'Importo troppo elevato');
+                              return;
+                            }
+                            Navigator.pop(ctx, value);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            minimumSize: const Size(0, 48),
+                          ),
+                          child: const Text('Continua'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _startNfcPayment() async {
     await _checkNfc();
     if (!mounted) return;
@@ -71,7 +209,14 @@ class _CardNfcScreenState extends State<CardNfcScreen>
       return;
     }
 
-    setState(() => _isPaying = true);
+    final amount = await _askAmount();
+    if (amount == null || !mounted) return;
+
+    setState(() {
+      _pendingAmount = amount;
+      _isPaying = true;
+      _isSuccess = false;
+    });
 
     NfcManager.instance
         .startSession(
@@ -86,7 +231,7 @@ class _CardNfcScreenState extends State<CardNfcScreen>
               await ApiService.nfcPay(
                 nfcToken: nfcToken,
                 merchantName: 'POS Contactless',
-                amount: 1.00,
+                amount: _pendingAmount ?? 0,
               );
 
               AppEvents.emitAccountDataChanged();
@@ -135,6 +280,9 @@ class _CardNfcScreenState extends State<CardNfcScreen>
     final gradientColors = isDark
         ? [const Color(0xFF1E3A8A), const Color(0xFF1E40AF)]
         : [const Color(0xFF1A56DB), const Color(0xFF1D4ED8)];
+
+    final last4 = _lastFourFromIban();
+    final cardholder = _cardholderName();
 
     return Scaffold(
       appBar: AppBar(title: const Text('Paga con NFC')),
@@ -192,32 +340,35 @@ class _CardNfcScreenState extends State<CardNfcScreen>
                               ),
                             ],
                           ),
-                          const Text(
-                            '4532  ••••  ••••  3456',
-                            style: TextStyle(
+                          Text(
+                            '••••  ••••  ••••  $last4',
+                            style: const TextStyle(
                               color: Colors.white,
                               fontSize: 20,
                               fontWeight: FontWeight.w600,
                               letterSpacing: 2,
                             ),
                           ),
-                          const Row(
+                          Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                'ALOK',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 1.5,
+                              Expanded(
+                                child: Text(
+                                  cardholder,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 1.2,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              Column(
+                              const Column(
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
                                   Text(
-                                    'SCADENZA',
+                                    'POS IoT',
                                     style: TextStyle(
                                       color: Colors.white54,
                                       fontSize: 8,
@@ -225,10 +376,10 @@ class _CardNfcScreenState extends State<CardNfcScreen>
                                     ),
                                   ),
                                   Text(
-                                    '12/30',
+                                    'CONTACTLESS',
                                     style: TextStyle(
                                       color: Colors.white70,
-                                      fontSize: 12,
+                                      fontSize: 11,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
@@ -298,6 +449,16 @@ class _CardNfcScreenState extends State<CardNfcScreen>
                           color: Color(0xFF059669),
                         ),
                       ),
+                      if (_pendingAmount != null) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          '€ ${_pendingAmount!.toStringAsFixed(2).replaceAll('.', ',')}',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ] else if (_isPaying) ...[
                       ScaleTransition(
                         scale: _pulseAnim,
@@ -308,9 +469,11 @@ class _CardNfcScreenState extends State<CardNfcScreen>
                         ),
                       ),
                       const SizedBox(height: 16),
-                      const Text(
-                        'Pronto per pagare',
-                        style: TextStyle(
+                      Text(
+                        _pendingAmount == null
+                            ? 'Pronto per pagare'
+                            : 'Paga € ${_pendingAmount!.toStringAsFixed(2).replaceAll('.', ',')}',
+                        style: const TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w700,
                         ),
@@ -328,7 +491,10 @@ class _CardNfcScreenState extends State<CardNfcScreen>
                       TextButton(
                         onPressed: () {
                           NfcManager.instance.stopSession();
-                          setState(() => _isPaying = false);
+                          setState(() {
+                            _isPaying = false;
+                            _pendingAmount = null;
+                          });
                         },
                         child: const Text(
                           'Annulla',
