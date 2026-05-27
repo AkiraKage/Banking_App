@@ -1,34 +1,32 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Check di integrità per l'app Banking_App (Flutter) e il backend POS IoT.
+Check di integrità per l'app Banking_App (Flutter).
 
 Cosa verifica:
   - Struttura del progetto Flutter (file fondamentali presenti)
   - File `.env` / `.env.example` con `API_BASE_URL` valido (senza placeholder)
-  - Dipendenze in `pubspec.yaml` (flutter_dotenv, http, provider, nfc_manager,
-    mobile_scanner, local_auth, flutter_secure_storage, app_settings)
+  - Dipendenze in `pubspec.yaml` (flutter_dotenv, http, provider,
+    mobile_scanner, local_auth, flutter_secure_storage, permission_handler)
   - main.dart che carica il `.env`
-  - api_service.dart con endpoint completi (incluso `/api/me`),
-    uso di `dotenv.env['API_BASE_URL']`, e header `ngrok-skip-browser-warning`
+  - api_service.dart con endpoint completi (incluso `/api/me`)
+    e header `ngrok-skip-browser-warning`
   - MeData definita in api_service per profilo + IBAN
-  - actions_tab.dart usa `ApiService.getMe()` per IBAN reale (no IBAN hardcoded)
-  - card_nfc_screen.dart usa importo dinamico (no `amount: 1.00` hardcoded)
-  - bank_card.dart accetta `cardholderName` e `lastFour` (no "ALOK" hardcoded)
+  - actions_tab.dart usa IBAN dinamico (no hardcoded)
+  - bank_card.dart parametrizzata con cardholderName/lastFour/iban
+    + bottone copia IBAN
   - home_tab.dart fa polling silenzioso ogni 30s + ascolta AppEvents
-  - transfer/qr/nfc emettono `AppEvents.emitAccountDataChanged`
-  - AndroidManifest con permessi INTERNET, NETWORK_STATE, CAMERA, NFC
-  - Backend POS opzionale (pos-projectiot/): webserver completo con `/api/me`
-    e bonifici interni con IBAN
+    + passa IBAN alla BankCard
+  - transfer/qr emettono `AppEvents.emitAccountDataChanged`
+  - AndroidManifest con permessi INTERNET, NETWORK_STATE, CAMERA
   - Reachability del backend su `/api/health` se `API_BASE_URL` valido
 """
 
-import os
 import re
 import sys
 from pathlib import Path
 from typing import Dict, List, Tuple
-from urllib import request, error
+from urllib import error, request
 
 PASS = "PASS"
 WARN = "WARN"
@@ -46,13 +44,13 @@ class Reporter:
         self.items.append((status, title, detail))
 
     def print(self) -> None:
-        print("\n=== CHECK PROGETTO POS IoT (App + Backend) ===\n")
+        print("\n=== CHECK PROGETTO BANKING APP ===\n")
         for status, title, detail in self.items:
             icon = {"PASS": "✅", "WARN": "⚠️", "FAIL": "❌"}.get(status, "•")
             print(f"{icon} [{status}] {title}")
             if detail:
                 print(f"   {detail}")
-        print("\n==============================================\n")
+        print("\n==================================\n")
         passed = sum(1 for i in self.items if i[0] == PASS)
         warns = sum(1 for i in self.items if i[0] == WARN)
         fails = sum(1 for i in self.items if i[0] == FAIL)
@@ -120,7 +118,6 @@ def main() -> int:
         root / "lib" / "services" / "api_service.dart",
         root / "lib" / "screens" / "home_tab.dart",
         root / "lib" / "screens" / "actions_tab.dart",
-        root / "lib" / "screens" / "card_nfc_screen.dart",
         root / "lib" / "screens" / "transfer_screen.dart",
         root / "lib" / "screens" / "qr_deposit_screen.dart",
         root / "lib" / "widgets" / "bank_card.dart",
@@ -166,9 +163,13 @@ def main() -> int:
     # ----------------------------------------------------------
     pubspec = read(root / "pubspec.yaml")
     required_deps = [
-        "flutter_dotenv", "http", "provider", "flutter_secure_storage",
-        "permission_handler", "mobile_scanner", "nfc_manager",
-        "local_auth", "app_settings",
+        "flutter_dotenv",
+        "http",
+        "provider",
+        "flutter_secure_storage",
+        "permission_handler",
+        "mobile_scanner",
+        "local_auth",
     ]
     missing_deps = [d for d in required_deps if d not in pubspec]
     if missing_deps:
@@ -179,8 +180,7 @@ def main() -> int:
     if "assets:" in pubspec and ".env" in pubspec:
         r.add(PASS, "pubspec.yaml include .env negli asset", "OK")
     else:
-        r.add(WARN, ".env non dichiarato negli asset di pubspec.yaml",
-              "Aggiungi - .env sotto la sezione assets:")
+        r.add(WARN, ".env non dichiarato negli asset di pubspec.yaml", "Aggiungi - .env sotto assets:")
 
     # ----------------------------------------------------------
     # 4) main.dart carica .env
@@ -189,8 +189,7 @@ def main() -> int:
     if "flutter_dotenv" in main_dart and "dotenv.load" in main_dart:
         r.add(PASS, "main.dart carica .env", "OK")
     else:
-        r.add(FAIL, "main.dart non carica .env",
-              "Aggiungi import flutter_dotenv + await dotenv.load()")
+        r.add(FAIL, "main.dart non carica .env", "Aggiungi import flutter_dotenv + await dotenv.load()")
 
     # ----------------------------------------------------------
     # 5) api_service.dart - wiring completo
@@ -198,9 +197,14 @@ def main() -> int:
     api_service = read(root / "lib" / "services" / "api_service.dart")
 
     endpoints = [
-        "/api/login", "/api/refresh", "/api/logout", "/api/me",
-        "/api/balance", "/api/transactions", "/api/transfer",
-        "/api/qr/", "/api/nfc/pay",
+        "/api/login",
+        "/api/refresh",
+        "/api/logout",
+        "/api/me",
+        "/api/balance",
+        "/api/transactions",
+        "/api/transfer",
+        "/api/qr/",
     ]
     missing_ep = [e for e in endpoints if e not in api_service]
     if missing_ep:
@@ -213,111 +217,88 @@ def main() -> int:
     else:
         r.add(WARN, "api_service non usa dotenv", "Controlla baseUrl")
 
-    # Bug 3: header ngrok-skip-browser-warning
     if "ngrok-skip-browser-warning" in api_service:
-        r.add(PASS, "Header ngrok-skip-browser-warning presente",
-              "Evita l'interstitial HTML di ngrok")
+        r.add(PASS, "Header ngrok-skip-browser-warning presente", "Evita interstitial HTML di ngrok")
     else:
-        r.add(FAIL, "Header ngrok-skip-browser-warning mancante",
-              "Aggiungere in _baseHeaders per evitare il parsing JSON rotto")
+        r.add(FAIL, "Header ngrok-skip-browser-warning mancante", "Aggiungere in _baseHeaders")
 
-    # Missing 2: classe MeData per /api/me
     if "class MeData" in api_service and "getMe()" in api_service:
         r.add(PASS, "MeData + getMe() definiti", "OK")
     else:
-        r.add(FAIL, "Classe MeData o metodo getMe() mancante",
-              "Necessari per leggere IBAN reale dall'API")
+        r.add(FAIL, "Classe MeData o metodo getMe() mancante", "Necessari per profilo + IBAN")
 
     # ----------------------------------------------------------
-    # 6) ActionsTab usa IBAN reale (Bug 1 + 6)
+    # 6) ActionsTab usa IBAN dinamico
     # ----------------------------------------------------------
     actions_tab = read(root / "lib" / "screens" / "actions_tab.dart")
-    if "ApiService.getMe()" in actions_tab and "MeData" in actions_tab:
-        r.add(PASS, "ActionsTab carica IBAN reale via getMe()", "OK")
+    if "authProvider.userIban" in actions_tab or "ApiService.getMe()" in actions_tab:
+        r.add(PASS, "ActionsTab usa IBAN dinamico", "OK")
     else:
-        r.add(FAIL, "ActionsTab non chiama /api/me",
-              "Aggiungi caricamento di MeData per mostrare IBAN dinamico")
+        r.add(FAIL, "ActionsTab non usa IBAN dinamico", "Usa authProvider.userIban o getMe()")
 
-    # IBAN hardcoded vecchio non più presente
     if "IT60 X054 2811 1010 0000 0123 456" in actions_tab:
-        r.add(FAIL, "IBAN hardcoded ancora presente in ActionsTab",
-              "Rimuovi il vecchio IBAN demo e usa il valore da MeData")
+        r.add(FAIL, "IBAN hardcoded ancora presente in ActionsTab", "Rimuovi il valore demo")
     else:
         r.add(PASS, "Nessun IBAN hardcoded in ActionsTab", "OK")
 
     # ----------------------------------------------------------
-    # 7) BankCard parametrizzata (Bug 6)
+    # 7) BankCard parametrizzata + copia IBAN
     # ----------------------------------------------------------
     bank_card = read(root / "lib" / "widgets" / "bank_card.dart")
-    if "cardholderName" in bank_card and "lastFour" in bank_card:
-        r.add(PASS, "BankCard accetta cardholderName e lastFour", "OK")
+
+    required_card_tokens = ["cardholderName", "lastFour", "iban"]
+    missing_card_tokens = [t for t in required_card_tokens if t not in bank_card]
+    if missing_card_tokens:
+        r.add(FAIL, "BankCard non completa", f"Mancano: {', '.join(missing_card_tokens)}")
     else:
-        r.add(FAIL, "BankCard non parametrizzata",
-              "Aggiungi cardholderName e lastFour come parametri required")
+        r.add(PASS, "BankCard parametrizzata (cardholderName/lastFour/iban)", "OK")
+
+    if "Clipboard.setData" in bank_card and ("Copia" in bank_card or "copy_rounded" in bank_card):
+        r.add(PASS, "BankCard ha copia IBAN", "OK")
+    else:
+        r.add(FAIL, "BankCard senza bottone copia IBAN", "Aggiungi Clipboard.setData + pulsante")
 
     if "'ALOK'" in bank_card or "ALOK" in bank_card.replace("CONTACTLESS", ""):
-        r.add(FAIL, "Nome 'ALOK' ancora hardcoded in BankCard",
-              "Sostituisci con cardholderName dinamico")
+        r.add(FAIL, "Nome hardcoded ancora presente in BankCard", "Sostituisci con cardholderName dinamico")
     else:
-        r.add(PASS, "Nessun nome 'ALOK' hardcoded in BankCard", "OK")
-
-    if "4532  ••••  ••••  3456" in bank_card:
-        r.add(FAIL, "Numero carta hardcoded in BankCard",
-              "Sostituisci con lastFour dinamico")
-    else:
-        r.add(PASS, "Numero carta non hardcoded in BankCard", "OK")
+        r.add(PASS, "Nessun nome hardcoded in BankCard", "OK")
 
     # ----------------------------------------------------------
-    # 8) CardNfcScreen - importo dinamico (Bug 5)
-    # ----------------------------------------------------------
-    card_nfc = read(root / "lib" / "screens" / "card_nfc_screen.dart")
-    if re.search(r"amount:\s*1\.00\s*,", card_nfc):
-        r.add(FAIL, "Importo NFC hardcoded a 1.00",
-              "Mostra un dialog/bottomsheet per chiedere l'importo all'utente")
-    else:
-        r.add(PASS, "Importo NFC non hardcoded a 1.00", "OK")
-
-    if "_askAmount" in card_nfc or "showModalBottomSheet" in card_nfc:
-        r.add(PASS, "CardNfcScreen chiede l'importo all'utente", "OK")
-    else:
-        r.add(WARN, "Nessun prompt importo trovato in CardNfcScreen",
-              "Verifica che ci sia un input prima di startSession")
-
-    # ----------------------------------------------------------
-    # 9) HomeTab - polling silenzioso (Missing 1)
+    # 8) HomeTab - polling + wiring BankCard
     # ----------------------------------------------------------
     home_tab = read(root / "lib" / "screens" / "home_tab.dart")
     if "AppEvents.stream.listen" in home_tab and "AppEvent.accountDataChanged" in home_tab:
         r.add(PASS, "HomeTab ascolta eventi refresh", "OK")
     else:
-        r.add(WARN, "HomeTab non ascolta eventi refresh",
-              "Cross-tab potrebbe non aggiornarsi")
+        r.add(WARN, "HomeTab non ascolta eventi refresh", "Cross-tab potrebbe non aggiornarsi")
 
     if "Timer.periodic" in home_tab and "_silentRefresh" in home_tab:
-        r.add(PASS, "HomeTab fa polling silenzioso per riflettere POS fisico", "OK")
+        r.add(PASS, "HomeTab fa polling silenzioso", "OK")
     else:
-        r.add(WARN, "HomeTab senza polling automatico",
-              "Aggiungi Timer.periodic per riflettere i pagamenti POS hardware")
+        r.add(WARN, "HomeTab senza polling automatico", "Aggiungi Timer.periodic")
 
     if "WidgetsBindingObserver" in home_tab and "didChangeAppLifecycleState" in home_tab:
-        r.add(PASS, "HomeTab gestisce ciclo di vita (resume/pause)", "OK")
+        r.add(PASS, "HomeTab gestisce lifecycle (resume/pause)", "OK")
     else:
-        r.add(WARN, "HomeTab non gestisce lifecycle",
-              "Consigliato per pausare il polling in background")
+        r.add(WARN, "HomeTab non gestisce lifecycle", "Consigliato per pausare polling in background")
+
+    if "iban:" in home_tab and "BankCard(" in home_tab:
+        r.add(PASS, "HomeTab passa IBAN alla BankCard", "OK")
+    else:
+        r.add(FAIL, "HomeTab non passa IBAN alla BankCard", "Aggiungi parametro iban: ...")
 
     # ----------------------------------------------------------
-    # 10) Cross-tab refresh (Transfer/QR/NFC)
+    # 9) Cross-tab refresh (Transfer/QR)
     # ----------------------------------------------------------
     transfer = read(root / "lib" / "screens" / "transfer_screen.dart")
     qr = read(root / "lib" / "screens" / "qr_deposit_screen.dart")
-    if all("AppEvents.emitAccountDataChanged()" in src for src in (transfer, qr, card_nfc)):
-        r.add(PASS, "Transfer/QR/NFC emettono refresh", "OK")
+    if all("AppEvents.emitAccountDataChanged()" in src for src in (transfer, qr)):
+        r.add(PASS, "Transfer/QR emettono refresh", "OK")
     else:
-        r.add(WARN, "Emit refresh mancante in una o più schermate",
-              "Controlla Transfer/QR/NFC")
+        r.add(WARN, "Emit refresh mancante in Transfer o QR", "Controlla le schermate")
 
     # ----------------------------------------------------------
-    # 11) AndroidManifest - permessi
+    # 10) AndroidManifest - permessi
     # ----------------------------------------------------------
     manifest_main = read(root / "android" / "app" / "src" / "main" / "AndroidManifest.xml")
     manifest_debug = read(root / "android" / "app" / "src" / "debug" / "AndroidManifest.xml")
@@ -326,98 +307,19 @@ def main() -> int:
         ("android.permission.INTERNET", "INTERNET"),
         ("android.permission.ACCESS_NETWORK_STATE", "ACCESS_NETWORK_STATE"),
         ("android.permission.CAMERA", "CAMERA (QR scanner)"),
-        ("android.permission.NFC", "NFC (contactless)"),
     ]:
         if perm in manifest_main:
             r.add(PASS, f"Manifest main: {friendly}", "OK")
         else:
-            r.add(WARN, f"Manifest main: {friendly} mancante",
-                  "Verifica necessità nel tuo caso")
+            r.add(WARN, f"Manifest main: {friendly} mancante", "Verifica necessità nel tuo caso")
 
     if "usesCleartextTraffic" in manifest_main or "usesCleartextTraffic" in manifest_debug:
         r.add(PASS, "Manifest cleartextTraffic attivo (debug http locale)", "OK")
     else:
-        r.add(WARN, "cleartextTraffic non dichiarato",
-              "Necessario se usi backend http (non https) locale")
+        r.add(WARN, "cleartextTraffic non dichiarato", "Serve se usi backend http locale")
 
     # ----------------------------------------------------------
-    # 12) Backend POS IoT (opzionale, se la cartella è qui)
-    # ----------------------------------------------------------
-    backend_dir = root / "pos-projectiot"
-    if backend_dir.is_dir():
-        r.add(PASS, "Cartella backend pos-projectiot/ presente", "Check esteso al backend")
-
-        webserver = read(backend_dir / "webserver.py")
-        if not webserver:
-            r.add(FAIL, "pos-projectiot/webserver.py mancante o vuoto", "")
-        else:
-            # Endpoint chiave (Missing 2 + Bug 1)
-            backend_endpoints = [
-                '@app.route("/api/me"', '@app.route("/api/transfer"',
-                '@app.route("/api/balance"', '@app.route("/api/login"',
-                '@app.route("/api/refresh"', '@app.route("/api/nfc/pay"',
-                '@app.route("/api/qr/confirm"',
-            ]
-            missing_be = [e.replace('@app.route("', "").rstrip('"')
-                          for e in backend_endpoints if e not in webserver]
-            if missing_be:
-                r.add(FAIL, "Endpoint backend mancanti", ", ".join(missing_be))
-            else:
-                r.add(PASS, "Endpoint backend completi", "OK")
-
-            # Bonifico interno (Bug 1)
-            if "iban_normalize" in webserver and "id_utente_riceve" in webserver:
-                r.add(PASS, "Bonifico interno con IBAN riconosciuto e accreditato",
-                      "Fix Bug 1 presente")
-            else:
-                r.add(WARN, "Bonifico interno potrebbe non accreditare destinatario",
-                      "Verifica /api/transfer in webserver.py")
-
-            # Header ngrok in CORS
-            if "ngrok-skip-browser-warning" in webserver:
-                r.add(PASS, "CORS backend autorizza header ngrok", "OK")
-            else:
-                r.add(WARN, "CORS senza header ngrok-skip-browser-warning",
-                      "Preflight potrebbero fallire")
-
-            # ACCESS_TOKEN_MINUTES default
-            if "ACCESS_TOKEN_MINUTES" in webserver:
-                m = re.search(r'ACCESS_TOKEN_MINUTES.*?env_int\(.*?,\s*(\d+)\s*\)', webserver)
-                if m:
-                    val = int(m.group(1))
-                    if val >= 60:
-                        r.add(PASS, f"ACCESS_TOKEN_MINUTES default = {val}", "Adatto per demo")
-                    else:
-                        r.add(WARN, f"ACCESS_TOKEN_MINUTES default = {val}",
-                              "Troppo breve per una demo, consigliato 1440")
-
-        # Hardware POS
-        pos_py = read(backend_dir / "pos.py")
-        if pos_py:
-            if "load_dotenv" in pos_py and 'os.getenv("DB_PASSWORD"' in pos_py:
-                r.add(PASS, "pos.py legge DB_PASSWORD da .env", "OK")
-            else:
-                r.add(WARN, "pos.py non usa .env per DB_PASSWORD",
-                      "Verifica la configurazione hardware")
-            if "RPi.GPIO" in pos_py and "SimpleMFRC522" in pos_py and "sh1106" in pos_py:
-                r.add(PASS, "pos.py contiene logica hardware completa",
-                      "RC522 + OLED + GPIO")
-            else:
-                r.add(WARN, "pos.py potrebbe non avere logica hardware completa", "")
-
-        # IBAN nel seed
-        init_db = read(backend_dir / "inizializza_db.py")
-        if init_db and "iban" in init_db and "genera_iban" in init_db:
-            r.add(PASS, "inizializza_db.py genera IBAN deterministico", "Fix Bug 1")
-        elif init_db:
-            r.add(WARN, "inizializza_db.py senza IBAN seed",
-                  "Bonifici interni potrebbero non funzionare")
-    else:
-        r.add(WARN, "Cartella pos-projectiot/ non trovata",
-              "Backend non controllato (probabilmente è in repo separato)")
-
-    # ----------------------------------------------------------
-    # 13) Reachability backend (se API_BASE_URL valido)
+    # 11) Reachability backend
     # ----------------------------------------------------------
     if env_real.exists() and app_env.get("API_BASE_URL"):
         api_base = app_env["API_BASE_URL"].rstrip("/")
@@ -426,11 +328,9 @@ def main() -> int:
             if code == 200:
                 r.add(PASS, "Reachability backend /api/health", "OK")
             elif code == 0:
-                r.add(WARN, "Backend non raggiungibile ora",
-                      f"Errore di rete: {body[:120]}")
+                r.add(WARN, "Backend non raggiungibile ora", f"Errore di rete: {body[:120]}")
             else:
-                r.add(WARN, f"Backend risponde con HTTP {code}",
-                      body[:160])
+                r.add(WARN, f"Backend risponde con HTTP {code}", body[:160])
 
     r.print()
     return 1 if r.failed else 0
