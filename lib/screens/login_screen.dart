@@ -9,6 +9,8 @@ import '../widgets/pin_boxes_input.dart';
 import 'main_layout.dart';
 import 'shared_pin_screen.dart';
 
+// Gestisce la schermata di accesso, supportando login standard (username/password),
+// login tramite PIN e autenticazione biometrica.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -16,13 +18,16 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
+// L'uso di SingleTickerProviderStateMixin permette di gestire le animazioni fluide.
 class _LoginScreenState extends State<LoginScreen>
     with SingleTickerProviderStateMixin {
+  // Controller per gestire l'input di testo nei vari campi.
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _pinController = TextEditingController();
   final _pinFocusNode = FocusNode();
 
+  // Variabili per gestire le animazioni di entrata della schermata.
   late final AnimationController _animController;
   late final Animation<double> _fadeAnim;
   late final Animation<Offset> _slideAnim;
@@ -42,6 +47,7 @@ class _LoginScreenState extends State<LoginScreen>
   @override
   void initState() {
     super.initState();
+    // Configura i parametri delle animazioni al caricamento del widget.
     _animController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 800),
@@ -52,15 +58,18 @@ class _LoginScreenState extends State<LoginScreen>
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _animController, curve: Curves.easeOut));
 
+    // Gestisce i cambiamenti nel controller dei PIN.
     _pinController.addListener(() {
       if (mounted) setState(() {});
     });
 
+    // Controlla se l'utente ha già configurato un PIN per mostrare la modalità corretta.
     _checkInitialState();
   }
 
   @override
   void dispose() {
+    // Libera le risorse per evitare sprechi di memoria.
     _animController.dispose();
     _usernameController.dispose();
     _passwordController.dispose();
@@ -69,6 +78,7 @@ class _LoginScreenState extends State<LoginScreen>
     super.dispose();
   }
 
+  // Recupera i dati di sessione salvati per decidere se mostrare il login con PIN.
   Future<void> _checkInitialState() async {
     _savedPin = await StorageService.getPin();
     _useBiometrics = await StorageService.getBiometrics();
@@ -84,6 +94,7 @@ class _LoginScreenState extends State<LoginScreen>
     _animController.forward();
   }
 
+  // Completa il login rapido e aggiorna lo stato dell'applicazione.
   Future<void> _completePinLogin() async {
     final name = await StorageService.getDisplayName() ?? _savedDisplayName;
     if (!mounted) return;
@@ -91,6 +102,7 @@ class _LoginScreenState extends State<LoginScreen>
     _navigateToHome();
   }
 
+  // Avvia la procedura di sblocco, provando prima con la biometria se attiva.
   void _startUnlockProcess() {
     setState(() {
       _isPinPromptActive = true;
@@ -104,6 +116,7 @@ class _LoginScreenState extends State<LoginScreen>
     }
   }
 
+  // Gestisce la verifica dell'impronta digitale o Face ID tramite il servizio dedicato.
   Future<void> _authenticateBiometrics() async {
     final ok = await BiometricService.authenticate(
       'Usa la biometria per accedere al conto',
@@ -117,6 +130,7 @@ class _LoginScreenState extends State<LoginScreen>
     }
   }
 
+  // Verifica che il PIN inserito corrisponda a quello salvato localmente.
   Future<void> _verifyPin() async {
     if (_pinController.text == _savedPin) {
       HapticFeedback.lightImpact();
@@ -131,6 +145,7 @@ class _LoginScreenState extends State<LoginScreen>
     }
   }
 
+  // Gestisce il login classico inviando le credenziali al server.
   void _handleStandardLogin() async {
     final username = _usernameController.text.trim();
     final password = _passwordController.text.trim();
@@ -154,6 +169,7 @@ class _LoginScreenState extends State<LoginScreen>
     setState(() => _isSubmitting = false);
 
     if (success) {
+      // Dopo il primo login, se il PIN non esiste, guida l'utente a configurarlo.
       final existingPin = await StorageService.getPin();
       if (existingPin == null) {
         final newPin = await Navigator.push<String>(
@@ -179,6 +195,7 @@ class _LoginScreenState extends State<LoginScreen>
     }
   }
 
+  // Chiede all'utente se desidera attivare l'accesso biometrico per il futuro.
   Future<void> _promptBiometricsSetup() async {
     final canCheck = await BiometricService.canCheckBiometrics();
     if (!mounted || !canCheck) return;
@@ -219,6 +236,7 @@ class _LoginScreenState extends State<LoginScreen>
     }
   }
 
+  // Naviga alla dashboard principale sostituendo la schermata corrente nello stack.
   void _navigateToHome() {
     Navigator.pushReplacement(
       context,
@@ -226,6 +244,7 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
+  // Consente di tornare alla modalità di login classica se il PIN è attivo.
   void _switchToPasswordMode() {
     setState(() {
       _isPinMode = false;
@@ -261,6 +280,7 @@ class _LoginScreenState extends State<LoginScreen>
       ),
       extendBodyBehindAppBar: true,
       body: SafeArea(
+        // Utilizza transizioni per un'interfaccia utente più curata e professionale.
         child: FadeTransition(
           opacity: _fadeAnim,
           child: SlideTransition(
@@ -296,6 +316,7 @@ class _LoginScreenState extends State<LoginScreen>
                       ),
                     ),
                     const SizedBox(height: 48),
+                    // Visualizza condizionalmente i campi PIN o Username/Password.
                     if (_isPinMode) ...[
                       if (!_isPinPromptActive) ...[
                         ElevatedButton.icon(
@@ -423,6 +444,7 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
+  // Widget helper per visualizzare gli errori in modo evidente ma elegante.
   Widget _buildErrorBanner() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),

@@ -17,6 +17,7 @@ enum TransactionCategory {
   other,
 }
 
+// Rappresenta una transazione finanziaria nell'applicazione.
 class TransactionModel {
   final String title;
   final double amount;
@@ -32,6 +33,8 @@ class TransactionModel {
     required this.category,
   });
 
+  // Factory constructor: crea un'istanza del modello a partire da dati in formato JSON (mappa).
+  // Utile per convertire le risposte ricevute dal server in oggetti Dart.
   factory TransactionModel.fromJson(Map<String, dynamic> json) {
     final typeRaw = (json['type'] ?? 'expense').toString().toLowerCase();
     final catRaw = (json['category'] ?? 'other').toString().toLowerCase();
@@ -39,6 +42,8 @@ class TransactionModel {
     final tType = typeRaw == 'income'
         ? TransactionType.income
         : TransactionType.expense;
+
+    // Utilizza il pattern matching di Dart 3 per mappare stringhe alle categorie.
     final tCategory = switch (catRaw) {
       'shopping' => TransactionCategory.shopping,
       'transport' => TransactionCategory.transport,
@@ -69,6 +74,7 @@ class TransactionModel {
     );
   }
 
+  // Getter: restituisce l'icona Flutter corrispondente alla categoria della transazione.
   IconData get icon {
     return switch (category) {
       TransactionCategory.shopping => Icons.shopping_bag_outlined,

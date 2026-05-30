@@ -5,6 +5,8 @@ import '../utils/storage_keys.dart';
 import '../widgets/pin_boxes_input.dart';
 import 'main_layout.dart';
 
+// Schermata per la configurazione iniziale del PIN di sicurezza dell'utente.
+// Gestisce il processo di doppia immissione (creazione e conferma) e l'attivazione della biometria.
 class PinSetupScreen extends StatefulWidget {
   const PinSetupScreen({super.key});
 
@@ -16,6 +18,7 @@ class _PinSetupScreenState extends State<PinSetupScreen>
     with SingleTickerProviderStateMixin {
   final _pinController = TextEditingController();
   final _pinFocusNode = FocusNode();
+  // FlutterSecureStorage garantisce che il PIN venga salvato in modo criptato sul dispositivo.
   final _storage = const FlutterSecureStorage();
   final _localAuth = LocalAuthentication();
 
@@ -35,6 +38,7 @@ class _PinSetupScreenState extends State<PinSetupScreen>
     )..forward();
     _fadeAnim = CurvedAnimation(parent: _animController, curve: Curves.easeOut);
 
+    // Richiede automaticamente il focus sul campo PIN appena la schermata è pronta.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) FocusScope.of(context).requestFocus(_pinFocusNode);
     });
@@ -48,9 +52,10 @@ class _PinSetupScreenState extends State<PinSetupScreen>
     super.dispose();
   }
 
+  // Elabora l'input del PIN distinguendo tra prima immissione e conferma.
   Future<void> _handlePinInput(String val) async {
     if (!_isConfirming) {
-      // Prima immissione
+      // Fase 1: Memorizza il primo PIN e passa alla fase di conferma.
       await _animController.reverse();
       setState(() {
         _firstPin = val;
@@ -62,7 +67,7 @@ class _PinSetupScreenState extends State<PinSetupScreen>
       if (!mounted) return;
       FocusScope.of(context).requestFocus(_pinFocusNode);
     } else {
-      // Conferma
+      // Fase 2: Verifica che il PIN di conferma sia identico al primo.
       if (val == _firstPin) {
         await _storage.write(key: StorageKeys.userPin, value: val);
         if (!mounted) return;
@@ -77,6 +82,7 @@ class _PinSetupScreenState extends State<PinSetupScreen>
     }
   }
 
+  // Propone all'utente di abilitare i sensori biometrici del dispositivo (impronta/viso).
   Future<void> _promptBiometrics() async {
     final canCheck = await _localAuth.canCheckBiometrics;
     if (!mounted) return;
@@ -163,7 +169,7 @@ class _PinSetupScreenState extends State<PinSetupScreen>
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Icona
+                // Icona decorativa che cambia in base allo stato del processo.
                 Container(
                   width: 72,
                   height: 72,
@@ -182,7 +188,7 @@ class _PinSetupScreenState extends State<PinSetupScreen>
                   ),
                 ),
 
-                // Titolo
+                // Titoli animati per guidare l'utente nei passaggi.
                 AnimatedSwitcher(
                   duration: const Duration(milliseconds: 250),
                   child: Text(
@@ -214,6 +220,7 @@ class _PinSetupScreenState extends State<PinSetupScreen>
 
                 const SizedBox(height: 48),
 
+                // Widget personalizzato per l'immissione del PIN in caselle separate.
                 PinBoxesInput(
                   controller: _pinController,
                   focusNode: _pinFocusNode,

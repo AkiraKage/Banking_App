@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 
+// Classe di configurazione centrale per l'aspetto visivo (UI) dell'applicazione.
+// Definisce i colori, i caratteri e gli stili dei componenti per i temi Chiaro e Scuro.
 class AppTheme {
   static const Color primaryBlue = Color(0xFF1A56DB);
   static const Color accentTeal = Color(0xFF0D9488);
 
+  // Configura il tema Chiaro (Light Mode) utilizzando le specifiche Material 3.
   static ThemeData get lightTheme {
     const cs = ColorScheme(
       brightness: Brightness.light,
@@ -41,6 +44,7 @@ class AppTheme {
         ),
         iconTheme: IconThemeData(color: Color(0xFF111827)),
       ),
+      // Definisce lo stile standard delle schede (Card) nell'app.
       cardTheme: CardThemeData(
         elevation: 0,
         shape: RoundedRectangleBorder(
@@ -49,6 +53,7 @@ class AppTheme {
         ),
         color: Colors.white,
       ),
+      // Personalizza l'aspetto dei campi di testo (TextField).
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: Colors.white,
@@ -71,6 +76,7 @@ class AppTheme {
         contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         labelStyle: TextStyle(color: Color(0xFF6B7280)),
       ),
+      // Configura lo stile globale dei bottoni principali.
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: primaryBlue,
@@ -83,6 +89,7 @@ class AppTheme {
           textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
       ),
+      // Imposta i colori della barra di navigazione inferiore.
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
@@ -119,6 +126,7 @@ class AppTheme {
     );
   }
 
+  // Configura il tema Scuro (Dark Mode) invertendo i colori e i contrasti.
   static ThemeData get darkTheme {
     const cs = ColorScheme(
       brightness: Brightness.dark,

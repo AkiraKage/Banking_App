@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+// Widget che visualizza graficamente la carta bancaria dell'utente.
+// Essendo uno StatelessWidget, non gestisce internamente il proprio stato,
+// ma riceve i dati necessari tramite il costruttore.
 class BankCard extends StatelessWidget {
   final double balance;
   final bool balanceVisible;
@@ -21,6 +24,7 @@ class BankCard extends StatelessWidget {
     required this.iban,
   });
 
+  // Formatta la stringa dell'IBAN aggiungendo uno spazio ogni 4 caratteri per leggibilità.
   String _formatIban(String value) {
     final clean = value.replaceAll(' ', '').toUpperCase();
     final buffer = StringBuffer();
@@ -31,6 +35,7 @@ class BankCard extends StatelessWidget {
     return buffer.toString();
   }
 
+  // Copia l'IBAN negli appunti del sistema e mostra una notifica (SnackBar).
   Future<void> _copyIban(BuildContext context, String value) async {
     await Clipboard.setData(ClipboardData(text: value));
     if (!context.mounted) return;
@@ -44,6 +49,7 @@ class BankCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Definisce i colori del gradiente in base al tema attuale (chiaro o scuro).
     final gradientColors = isDark
         ? [const Color(0xFF1E3A8A), const Color(0xFF1E40AF)]
         : [const Color(0xFF1A56DB), const Color(0xFF1D4ED8)];

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+// Widget personalizzato per l'immissione del PIN tramite caselle quadrate separate.
+// Utilizza un TextField invisibile per gestire l'input e dei box grafici per visualizzarlo.
 class PinBoxesInput extends StatelessWidget {
   final TextEditingController controller;
   final FocusNode focusNode;
@@ -25,10 +27,12 @@ class PinBoxesInput extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return GestureDetector(
+      // Garantisce che il tastierino numerico appaia quando l'utente tocca i box.
       onTap: () => FocusScope.of(context).requestFocus(focusNode),
       child: Stack(
         alignment: Alignment.center,
         children: [
+          // Parte grafica: disegna le caselle basandosi sul contenuto del controller.
           AnimatedBuilder(
             animation: controller,
             builder: (context, _) {
@@ -40,7 +44,6 @@ class PinBoxesInput extends StatelessWidget {
                   final isActive = index == text.length;
                   return AnimatedContainer(
                     duration: const Duration(milliseconds: 150),
-                    // MARGINI E DIMENSIONI RIDOTTE PER EVITARE OVERFLOW
                     margin: const EdgeInsets.symmetric(horizontal: 4),
                     width: 40,
                     height: 52,
@@ -88,6 +91,7 @@ class PinBoxesInput extends StatelessWidget {
               );
             },
           ),
+          // TextField reale ma nascosto per catturare l'input della tastiera di sistema.
           Opacity(
             opacity: 0,
             child: TextField(
@@ -100,6 +104,7 @@ class PinBoxesInput extends StatelessWidget {
               decoration: const InputDecoration(counterText: ''),
               onChanged: (value) {
                 onChanged?.call(value);
+                // Triggera automaticamente onCompleted quando la lunghezza massima viene raggiunta.
                 if (value.length == pinLength) {
                   onCompleted?.call(value);
                 }

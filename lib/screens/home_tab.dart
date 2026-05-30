@@ -11,6 +11,8 @@ import '../widgets/monthly_summary.dart';
 import '../widgets/transaction_tile.dart';
 import 'transactions_history_screen.dart';
 
+// Rappresenta la schermata principale (Dashboard) dell'applicazione.
+// È uno StatefulWidget perché deve gestire dati che cambiano nel tempo (saldo, transazioni).
 class HomeTab extends StatefulWidget {
   const HomeTab({super.key});
 
@@ -18,6 +20,8 @@ class HomeTab extends StatefulWidget {
   State<HomeTab> createState() => _HomeTabState();
 }
 
+// Lo stato associato a HomeTab. Implementa WidgetsBindingObserver per rilevare
+// quando l'app torna in primo piano (es. dopo essere stata ridotta a icona).
 class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
   bool _balanceVisible = true;
   bool _loading = true;
@@ -37,18 +41,23 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    // Registra l'observer per il ciclo di vita dell'app.
     WidgetsBinding.instance.addObserver(this);
+    // Carica i dati iniziali.
     _loadDashboard();
+    // Ascolta eventi globali (es. se un'altra parte dell'app segnala che i dati sono cambiati).
     _eventsSub = AppEvents.stream.listen((event) {
       if (event == AppEvent.accountDataChanged) {
         _loadDashboard();
       }
     });
+    // Avvia l'aggiornamento automatico periodico.
     _startPolling();
   }
 
   @override
   void dispose() {
+    // Importante: rimuove l'observer e cancella i timer per evitare perdite di memoria.
     WidgetsBinding.instance.removeObserver(this);
     _eventsSub?.cancel();
     _pollTimer?.cancel();
@@ -57,19 +66,23 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Quando l'app torna visibile, riprende l'aggiornamento dei dati.
     if (state == AppLifecycleState.resumed) {
       _startPolling();
       _loadDashboard();
     } else {
+      // Ferma il timer quando l'app è in background per risparmiare risorse.
       _pollTimer?.cancel();
     }
   }
 
+  // Configura un timer che aggiorna i dati ogni 30 secondi.
   void _startPolling() {
     _pollTimer?.cancel();
     _pollTimer = Timer.periodic(_pollInterval, (_) => _silentRefresh());
   }
 
+  // Aggiorna i dati in background senza mostrare indicatori di caricamento.
   Future<void> _silentRefresh() async {
     try {
       final balanceData = await ApiService.getBalance();
@@ -84,6 +97,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
     } catch (_) {}
   }
 
+  // Esegue il caricamento completo iniziale di tutti i dati necessari.
   Future<void> _loadDashboard() async {
     if (mounted) {
       setState(() {
@@ -93,6 +107,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
     }
 
     try {
+      // Esegue più richieste API contemporaneamente per velocizzare il caricamento.
       final results = await Future.wait([
         ApiService.getBalance(),
         ApiService.getTransactions(),

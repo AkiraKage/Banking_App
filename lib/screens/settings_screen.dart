@@ -9,6 +9,8 @@ import '../widgets/section_header.dart';
 import 'login_screen.dart';
 import 'shared_pin_screen.dart';
 
+// Gestisce le preferenze dell'utente, inclusi il tema, le impostazioni di sicurezza
+// e le informazioni sul profilo.
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -24,9 +26,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void initState() {
     super.initState();
+    // Carica le preferenze salvate localmente all'apertura della schermata.
     _loadSettings();
   }
 
+  // Recupera lo stato attuale delle impostazioni biometriche dal servizio di storage.
   Future<void> _loadSettings() async {
     final useBio = await StorageService.getBiometrics();
     final canCheck = await BiometricService.canCheckBiometrics();
@@ -38,6 +42,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
   }
 
+  // Attiva o disattiva l'uso della biometria, richiedendo autenticazione per l'abilitazione.
   Future<void> _toggleBiometrics(bool value) async {
     if (value) {
       final ok = await BiometricService.authenticate(
@@ -53,10 +58,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  // Avvia la procedura per modificare il PIN di sicurezza esistente.
   Future<void> _changePinFlow() async {
     final currentPin = await StorageService.getPin();
     if (!mounted) return;
 
+    // Utilizza SharedPinScreen con l'azione 'change' per gestire la logica di modifica.
     final newPin = await Navigator.push<String>(
       context,
       MaterialPageRoute(
@@ -71,6 +78,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  // Mostra un feedback visivo rapido tramite SnackBar.
   void _showSnack(String msg, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -94,10 +102,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  // Gestisce la chiusura della sessione e il ritorno alla schermata di login.
   Future<void> _handleLogout() async {
     await context.read<AuthProvider>().logout();
 
     if (!mounted) return;
+    // Rimuove tutte le rotte precedenti per impedire all'utente di tornare indietro dopo il logout.
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (_) => const LoginScreen()),
@@ -140,6 +150,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   isDark: isDark,
                   onTap: _changePinFlow,
                 ),
+                // Mostra l'opzione biometrica solo se il dispositivo la supporta.
                 if (_canCheckBiometrics)
                   SettingsTile(
                     icon: Icons.fingerprint_rounded,

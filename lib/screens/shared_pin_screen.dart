@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../widgets/pin_boxes_input.dart';
 
+// Schermata versatile per la gestione del PIN: supporta creazione, verifica e modifica.
+// Viene utilizzata come componente condiviso per diverse operazioni di sicurezza.
 enum PinAction { setup, verify, change }
 
 class SharedPinScreen extends StatefulWidget {
@@ -17,6 +19,7 @@ class _SharedPinScreenState extends State<SharedPinScreen> {
   final _pinController = TextEditingController();
   final _focusNode = FocusNode();
 
+  // Rappresenta la fase attuale del processo (0: verifica attuale, 1: inserimento nuovo, 2: conferma).
   late int _step;
   String _firstPin = '';
   String? _errorMessage;
@@ -24,9 +27,10 @@ class _SharedPinScreenState extends State<SharedPinScreen> {
   @override
   void initState() {
     super.initState();
+    // Inizializza lo step in base all'azione richiesta: setup parte direttamente dalla creazione.
     _step = (widget.action == PinAction.setup) ? 1 : 0;
 
-    // Aggiorniamo la UI ad ogni digitazione per abilitare/disabilitare il bottone "Avanti"
+    // Aggiorna l'interfaccia ad ogni cifra inserita per gestire lo stato del bottone.
     _pinController.addListener(() {
       if (mounted) setState(() {});
     });
@@ -43,6 +47,7 @@ class _SharedPinScreenState extends State<SharedPinScreen> {
     super.dispose();
   }
 
+  // Gestisce la logica di avanzamento tra i vari passaggi dell'operazione PIN.
   void _handlePinSubmit() {
     final val = _pinController.text;
     if (val.length != 6) return;
@@ -50,6 +55,7 @@ class _SharedPinScreenState extends State<SharedPinScreen> {
     setState(() => _errorMessage = null);
 
     if (_step == 0) {
+      // Fase di verifica del PIN esistente (per modifiche o accessi sensibili).
       if (val == widget.currentPin) {
         if (widget.action == PinAction.verify) {
           Navigator.pop(context, true);
@@ -68,6 +74,7 @@ class _SharedPinScreenState extends State<SharedPinScreen> {
         _focusNode.requestFocus();
       }
     } else if (_step == 1) {
+      // Fase di acquisizione del nuovo PIN.
       setState(() {
         _firstPin = val;
         _step = 2;
@@ -75,6 +82,7 @@ class _SharedPinScreenState extends State<SharedPinScreen> {
       });
       _focusNode.requestFocus();
     } else if (_step == 2) {
+      // Fase di conferma finale del nuovo PIN.
       if (val == _firstPin) {
         Navigator.pop(context, val);
       } else {
@@ -89,6 +97,7 @@ class _SharedPinScreenState extends State<SharedPinScreen> {
     }
   }
 
+  // Restituisce il titolo dinamico in base allo stato del processo.
   String get _title {
     if (_step == 0) return 'PIN attuale';
     if (_step == 1)
@@ -96,6 +105,7 @@ class _SharedPinScreenState extends State<SharedPinScreen> {
     return 'Conferma il PIN';
   }
 
+  // Restituisce il sottotitolo informativo in base allo stato del processo.
   String get _subtitle {
     if (_step == 0)
       return 'Inserisci il tuo codice di sicurezza per continuare.';
@@ -106,6 +116,7 @@ class _SharedPinScreenState extends State<SharedPinScreen> {
     return 'Digita nuovamente per confermare il codice.';
   }
 
+  // Seleziona l'icona appropriata per il passaggio corrente.
   IconData get _icon {
     if (_step == 0) return Icons.lock_person_rounded;
     if (_step == 1) return Icons.lock_outline_rounded;
@@ -126,6 +137,7 @@ class _SharedPinScreenState extends State<SharedPinScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Icona dinamica con animazione di transizione tra i vari step.
               Container(
                 width: 72,
                 height: 72,
@@ -145,6 +157,7 @@ class _SharedPinScreenState extends State<SharedPinScreen> {
                   ),
                 ),
               ),
+              // Titolo e testo di guida animati.
               AnimatedSwitcher(
                 duration: const Duration(milliseconds: 300),
                 child: Column(
@@ -175,17 +188,17 @@ class _SharedPinScreenState extends State<SharedPinScreen> {
               ),
               const SizedBox(height: 48),
 
+              // Campo di input per il PIN a 6 cifre.
               PinBoxesInput(
                 controller: _pinController,
                 focusNode: _focusNode,
                 autofocus: true,
                 onChanged: (_) => setState(() => _errorMessage = null),
-                // onCompleted rimosso: l'utente deve premere il bottone avanti
               ),
 
               const SizedBox(height: 32),
 
-              // Bottone Avanti Manuale
+              // Pulsante di conferma manuale dell'inserimento.
               ElevatedButton(
                 onPressed: _pinController.text.length == 6
                     ? _handlePinSubmit
@@ -195,6 +208,7 @@ class _SharedPinScreenState extends State<SharedPinScreen> {
 
               const SizedBox(height: 20),
 
+              // Banner per la visualizzazione di eventuali errori di validazione o digitazione.
               if (_errorMessage != null)
                 Container(
                   padding: const EdgeInsets.symmetric(

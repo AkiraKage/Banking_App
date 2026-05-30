@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+// Componente riutilizzabile per le voci della schermata impostazioni.
+// Estende le funzionalità del ListTile standard con uno stile personalizzato e icone racchiuse in box.
 class SettingsTile extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -21,6 +23,7 @@ class SettingsTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
+      // Icona a sinistra con sfondo arrotondato per differenziarla dal testo.
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
@@ -44,6 +47,7 @@ class SettingsTile extends StatelessWidget {
           color: isDark ? const Color(0xFF6B7280) : const Color(0xFF9CA3AF),
         ),
       ),
+      // Visualizza un componente personalizzato a destra (es. Switch) o una freccia se è cliccabile.
       trailing:
           trailing ??
           (onTap != null

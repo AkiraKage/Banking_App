@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import '../models/transaction_model.dart';
 import 'storage_service.dart';
 
+// Classe personalizzata per gestire gli errori restituiti dalle API.
 class ApiException implements Exception {
   final String message;
   final int? statusCode;
@@ -14,6 +15,7 @@ class ApiException implements Exception {
   String toString() => message;
 }
 
+// Struttura dati per le informazioni sul saldo e riepilogo mensile.
 class BalanceData {
   final double balance;
   final double incomeMonth;
@@ -26,6 +28,7 @@ class BalanceData {
   });
 }
 
+// Struttura dati per i dettagli di un pagamento tramite QR code.
 class QrDetails {
   final double amount;
   final String merchantName;
@@ -33,6 +36,7 @@ class QrDetails {
   const QrDetails({required this.amount, required this.merchantName});
 }
 
+// Struttura dati per il profilo dell'utente corrente.
 class MeData {
   final int id;
   final String name;
@@ -51,22 +55,25 @@ class MeData {
   });
 }
 
+// Gestisce tutte le comunicazioni HTTP verso il server backend.
 class ApiService {
   static const Duration _timeout = Duration(seconds: 15);
 
   // Header base condivisi: include ngrok-skip-browser-warning per evitare
-  // l'interstitial HTML di ngrok che rompe il parsing JSON
+  // l'interstitial HTML di ngrok che rompe il parsing JSON.
   static Map<String, String> get _baseHeaders => {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
     'ngrok-skip-browser-warning': 'true',
   };
 
+  // Crea gli header includendo il token Bearer per l'autenticazione.
   static Map<String, String> _authHeaders(String token) => {
     ..._baseHeaders,
     'Authorization': 'Bearer $token',
   };
 
+  // Ottiene l'URL base dalle variabili d'ambiente o usa un default per emulatore.
   static String get baseUrl {
     final envUrl = dotenv.env['API_BASE_URL']?.trim();
     final raw = (envUrl != null && envUrl.isNotEmpty)
@@ -78,23 +85,26 @@ class ApiService {
     return raw.endsWith('/') ? raw.substring(0, raw.length - 1) : raw;
   }
 
+  // Costruisce un oggetto Uri completo partendo da un percorso relativo.
   static Uri _uri(String path) {
     final fixedPath = path.startsWith('/') ? path : '/$path';
     return Uri.parse('$baseUrl$fixedPath');
   }
 
+  // Utility per convertire valori dinamici (es. da JSON) in double in modo sicuro.
   static double _toDouble(dynamic v) {
     if (v is num) return v.toDouble();
     return double.tryParse(v.toString()) ?? 0.0;
   }
 
+  // Decodifica il corpo della risposta HTTP da JSON a Map di Dart.
   static Future<Map<String, dynamic>> _decodeResponse(http.Response res) async {
     if (res.body.isEmpty) return {};
     try {
       final decoded = jsonDecode(res.body);
       if (decoded is Map<String, dynamic>) return decoded;
     } catch (_) {
-      // Risposta non JSON (es. interstitial HTML): trattiamo come vuota
+      // Se la risposta non è JSON valido, viene restituita una mappa vuota.
     }
     return {};
   }
@@ -157,6 +167,7 @@ class ApiService {
     return res;
   }
 
+  // Esegue il login dell'utente e restituisce i dati della sessione.
   static Future<Map<String, dynamic>> login({
     required String username,
     required String password,
@@ -179,6 +190,7 @@ class ApiService {
     return data;
   }
 
+  // Invia una richiesta di logout al server per invalidare i token.
   static Future<void> logout() async {
     final token = await StorageService.getAuthToken();
     final refresh = await StorageService.getRefreshToken();
@@ -196,6 +208,7 @@ class ApiService {
     }
   }
 
+  // Recupera le informazioni sul profilo dell'utente loggato.
   static Future<MeData> getMe() async {
     final res = await _authedRequest((token) {
       return http.get(_uri('/api/me'), headers: _authHeaders(token));
@@ -220,6 +233,7 @@ class ApiService {
     );
   }
 
+  // Recupera il saldo attuale e il riepilogo mensile delle entrate/uscite.
   static Future<BalanceData> getBalance() async {
     final res = await _authedRequest((token) {
       return http.get(_uri('/api/balance'), headers: _authHeaders(token));
@@ -241,6 +255,7 @@ class ApiService {
     );
   }
 
+  // Recupera la lista delle transazioni effettuate dall'utente.
   static Future<List<TransactionModel>> getTransactions() async {
     final res = await _authedRequest((token) {
       return http.get(_uri('/api/transactions'), headers: _authHeaders(token));
@@ -260,6 +275,7 @@ class ApiService {
         .toList();
   }
 
+  // Ottiene i dettagli di una ricarica tramite QR code.
   static Future<QrDetails> getQrDetails(String qrToken) async {
     final res = await _authedRequest((token) {
       return http.get(_uri('/api/qr/$qrToken'), headers: _authHeaders(token));
@@ -279,6 +295,7 @@ class ApiService {
     );
   }
 
+  // Invia una richiesta di conferma di ricarica tramite QR code.
   static Future<Map<String, dynamic>> confirmQr(String qrToken) async {
     final res = await _authedRequest((token) {
       return http.post(
@@ -298,6 +315,7 @@ class ApiService {
     return data;
   }
 
+  // Crea un nuovo bonifico tra due utenti.
   static Future<Map<String, dynamic>> createTransfer({
     required String beneficiary,
     required String iban,

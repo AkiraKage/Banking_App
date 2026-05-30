@@ -4,6 +4,8 @@ import 'package:permission_handler/permission_handler.dart';
 import '../services/api_service.dart';
 import '../services/app_events.dart';
 
+// Schermata per effettuare un versamento tramite scansione di un QR code.
+// Gestisce i permessi della fotocamera e l'elaborazione del codice scansionato.
 class QrDepositScreen extends StatefulWidget {
   const QrDepositScreen({super.key});
 
@@ -13,6 +15,7 @@ class QrDepositScreen extends StatefulWidget {
 
 class _QrDepositScreenState extends State<QrDepositScreen>
     with WidgetsBindingObserver {
+  // Controller per gestire l'avvio e l'arresto della fotocamera.
   final _scannerCtrl = MobileScannerController();
 
   bool _hasPermission = false;
@@ -23,6 +26,7 @@ class _QrDepositScreenState extends State<QrDepositScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // Verifica i permessi all'apertura della schermata.
     _checkPermission();
   }
 
@@ -35,12 +39,14 @@ class _QrDepositScreenState extends State<QrDepositScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Se l'utente torna nell'app dopo aver dato i permessi nelle impostazioni di sistema.
     if (state == AppLifecycleState.resumed) {
       if (mounted) setState(() => _isCheckingPermission = true);
       _checkPermission();
     }
   }
 
+  // Controlla se l'utente ha già concesso l'uso della fotocamera.
   Future<void> _checkPermission() async {
     final status = await Permission.camera.status;
     if (!mounted) return;
@@ -50,6 +56,7 @@ class _QrDepositScreenState extends State<QrDepositScreen>
     });
   }
 
+  // Richiede esplicitamente il permesso di usare la fotocamera.
   Future<void> _requestPermission() async {
     final status = await Permission.camera.request();
     if (!mounted) return;
@@ -57,6 +64,7 @@ class _QrDepositScreenState extends State<QrDepositScreen>
     await _checkPermission();
   }
 
+  // Estrae il token identificativo dall'URL o dalla stringa contenuta nel QR.
   String _extractQrToken(String raw) {
     final cleaned = raw.trim();
     if (cleaned.contains('/pay/')) {
@@ -79,21 +87,25 @@ class _QrDepositScreenState extends State<QrDepositScreen>
     );
   }
 
+  // Funzione chiamata quando la fotocamera rileva un codice QR.
   Future<void> _onDetect(BarcodeCapture capture) async {
     if (_isProcessing) return;
     final barcodes = capture.barcodes;
     if (barcodes.isEmpty || barcodes.first.rawValue == null) return;
 
     setState(() => _isProcessing = true);
+    // Ferma lo scanner per evitare letture multiple dello stesso codice.
     await _scannerCtrl.stop();
 
     final raw = barcodes.first.rawValue!;
     final qrToken = _extractQrToken(raw);
 
     try {
+      // Recupera i dettagli del versamento (importo ed esercente) dal server.
       final details = await ApiService.getQrDetails(qrToken);
       if (!mounted) return;
 
+      // Chiede conferma all'utente prima di procedere con l'accredito.
       final confirmed = await showDialog<bool>(
         context: context,
         barrierDismissible: false,
@@ -142,6 +154,7 @@ class _QrDepositScreenState extends State<QrDepositScreen>
       );
 
       if (confirmed == true) {
+        // Invia la conferma definitiva al server.
         final result = await ApiService.confirmQr(qrToken);
         AppEvents.emitAccountDataChanged();
 
@@ -156,6 +169,7 @@ class _QrDepositScreenState extends State<QrDepositScreen>
           ),
         );
       } else {
+        // Se l'utente annulla, riavvia lo scanner per una nuova lettura.
         if (!mounted) return;
         setState(() => _isProcessing = false);
         await _scannerCtrl.start();
@@ -180,7 +194,9 @@ class _QrDepositScreenState extends State<QrDepositScreen>
           : _hasPermission
           ? Stack(
               children: [
+                // Visualizzazione della fotocamera a tutto schermo.
                 MobileScanner(controller: _scannerCtrl, onDetect: _onDetect),
+                // Overlay scuro con un "buco" centrale per guidare l'utente.
                 ColorFiltered(
                   colorFilter: ColorFilter.mode(
                     Colors.black.withValues(alpha: 0.6),
@@ -207,6 +223,7 @@ class _QrDepositScreenState extends State<QrDepositScreen>
                     ],
                   ),
                 ),
+                // Disegna gli angoli del mirino sopra la fotocamera.
                 Center(
                   child: SizedBox(
                     width: 240,
@@ -245,62 +262,68 @@ class _QrDepositScreenState extends State<QrDepositScreen>
                 ),
               ],
             )
-          : Center(
-              child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: isDark
-                            ? const Color(0xFF1F2937)
-                            : const Color(0xFFF3F4F6),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Icon(
-                        Icons.no_photography_outlined,
-                        size: 60,
-                        color: Color(0xFF9CA3AF),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    const Text(
-                      'Permesso fotocamera negato',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Per scansionare i QR è necessario consentire l\'accesso alla fotocamera.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: isDark
-                            ? const Color(0xFF9CA3AF)
-                            : const Color(0xFF6B7280),
-                      ),
-                    ),
-                    const SizedBox(height: 28),
-                    ElevatedButton.icon(
-                      onPressed: _requestPermission,
-                      icon: const Icon(Icons.camera_alt_outlined),
-                      label: const Text('Consenti fotocamera'),
-                      style: ElevatedButton.styleFrom(
-                        minimumSize: const Size(220, 50),
-                      ),
-                    ),
-                  ],
-                ),
+          : _buildPermissionDenied(isDark), // Mostra la richiesta di permessi se negati.
+    );
+  }
+
+  // Interfaccia visualizzata quando i permessi della fotocamera non sono concessi.
+  Widget _buildPermissionDenied(bool isDark) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: isDark
+                    ? const Color(0xFF1F2937)
+                    : const Color(0xFFF3F4F6),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Icon(
+                Icons.no_photography_outlined,
+                size: 60,
+                color: Color(0xFF9CA3AF),
               ),
             ),
+            const SizedBox(height: 24),
+            const Text(
+              'Permesso fotocamera negato',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Per scansionare i QR è necessario consentire l\'accesso alla fotocamera.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: isDark
+                    ? const Color(0xFF9CA3AF)
+                    : const Color(0xFF6B7280),
+              ),
+            ),
+            const SizedBox(height: 28),
+            ElevatedButton.icon(
+              onPressed: _requestPermission,
+              icon: const Icon(Icons.camera_alt_outlined),
+              label: const Text('Consenti fotocamera'),
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size(220, 50),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
 
+// Pittore personalizzato per disegnare i quattro angoli del mirino dello scanner.
 class _ScannerCornerPainter extends CustomPainter {
   final Color color;
 
@@ -317,6 +340,7 @@ class _ScannerCornerPainter extends CustomPainter {
     const length = 28.0;
     const radius = 16.0;
 
+    // Disegna l'angolo in alto a sinistra.
     canvas.drawLine(const Offset(radius, 0), const Offset(length, 0), paint);
     canvas.drawLine(const Offset(0, radius), const Offset(0, length), paint);
     canvas.drawArc(
@@ -327,6 +351,7 @@ class _ScannerCornerPainter extends CustomPainter {
       paint,
     );
 
+    // Disegna l'angolo in alto a destra.
     final tr = Offset(size.width, 0);
     canvas.drawLine(
       Offset(tr.dx - radius, tr.dy),
@@ -346,6 +371,7 @@ class _ScannerCornerPainter extends CustomPainter {
       paint,
     );
 
+    // Disegna l'angolo in basso a sinistra.
     final bl = Offset(0, size.height);
     canvas.drawLine(
       Offset(bl.dx + radius, bl.dy),
@@ -365,6 +391,7 @@ class _ScannerCornerPainter extends CustomPainter {
       paint,
     );
 
+    // Disegna l'angolo in basso a destra.
     final br = Offset(size.width, size.height);
     canvas.drawLine(
       Offset(br.dx - radius, br.dy),
@@ -393,3 +420,4 @@ class _ScannerCornerPainter extends CustomPainter {
   @override
   bool shouldRepaint(_ScannerCornerPainter old) => old.color != color;
 }
+

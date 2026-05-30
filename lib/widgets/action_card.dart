@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+// Widget che rappresenta una voce cliccabile nella sezione "Operazioni".
+// Utilizza Material ed InkWell per fornire il feedback visivo (effetto onda) al tocco.
 class ActionCard extends StatelessWidget {
   final String title;
   final String subtitle;
@@ -36,6 +38,7 @@ class ActionCard extends StatelessWidget {
           ),
           child: Row(
             children: [
+              // Icona identificativa dell'azione all'interno di un box colorato.
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -45,6 +48,7 @@ class ActionCard extends StatelessWidget {
                 child: Icon(icon, color: color, size: 24),
               ),
               const SizedBox(width: 16),
+              // Titolo e descrizione dell'operazione.
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -69,6 +73,7 @@ class ActionCard extends StatelessWidget {
                   ],
                 ),
               ),
+              // Icona "freccia" per indicare la natura interattiva dell'elemento.
               Icon(
                 Icons.chevron_right_rounded,
                 color: isDark

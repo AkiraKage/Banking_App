@@ -1,5 +1,7 @@
 import '../models/transaction_model.dart';
 
+// Elenco di transazioni fittizie utilizzate per scopi dimostrativi e test dell'interfaccia.
+// Permette di visualizzare l'app con dati popolati senza dover attendere risposte reali dal server.
 final List<TransactionModel> demoTransactions = [
   TransactionModel(
     title: 'Accredito Stipendio Maggio',

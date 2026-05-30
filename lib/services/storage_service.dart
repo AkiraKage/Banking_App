@@ -1,9 +1,12 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../utils/storage_keys.dart';
 
+// Fornisce un'interfaccia per salvare e recuperare dati in modo sicuro sul dispositivo.
+// Utilizza FlutterSecureStorage per crittografare i dati sensibili.
 class StorageService {
   static const _storage = FlutterSecureStorage();
 
+  // Gestione del PIN utente.
   static Future<void> savePin(String pin) async =>
       _storage.write(key: StorageKeys.userPin, value: pin);
   static Future<String?> getPin() async =>
@@ -11,6 +14,7 @@ class StorageService {
   static Future<void> deletePin() async =>
       _storage.delete(key: StorageKeys.userPin);
 
+  // Gestione delle impostazioni biometriche (es. impronta digitale).
   static Future<void> setBiometrics(bool value) async =>
       _storage.write(key: StorageKeys.useBiometrics, value: value.toString());
   static Future<bool> getBiometrics() async {
@@ -20,6 +24,7 @@ class StorageService {
   static Future<void> deleteBiometrics() async =>
       _storage.delete(key: StorageKeys.useBiometrics);
 
+  // Gestione dei token di autenticazione JWT.
   static Future<void> saveAuthToken(String token) async =>
       _storage.write(key: StorageKeys.authToken, value: token);
   static Future<String?> getAuthToken() async =>
@@ -34,6 +39,7 @@ class StorageService {
   static Future<void> deleteRefreshToken() async =>
       _storage.delete(key: StorageKeys.refreshToken);
 
+  // Gestione delle informazioni personali dell'utente.
   static Future<void> saveDisplayName(String value) async =>
       _storage.write(key: StorageKeys.userDisplayName, value: value);
   static Future<String?> getDisplayName() async =>
@@ -48,7 +54,7 @@ class StorageService {
   static Future<void> deleteUserId() async =>
       _storage.delete(key: StorageKeys.userId);
 
-  // IBAN dell'utente (letto da /api/me al login)
+  // Salva l'IBAN dell'utente, letto dal server al login.
   static Future<void> saveIban(String value) async =>
       _storage.write(key: StorageKeys.userIban, value: value);
   static Future<String?> getIban() async =>
@@ -56,6 +62,7 @@ class StorageService {
   static Future<void> deleteIban() async =>
       _storage.delete(key: StorageKeys.userIban);
 
+  // Elimina tutti i dati relativi alla sessione corrente.
   static Future<void> clearSession() async {
     await deleteAuthToken();
     await deleteRefreshToken();

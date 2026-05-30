@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import '../services/api_service.dart';
 import '../services/app_events.dart';
 
+// Schermata per l'esecuzione di un nuovo bonifico bancario.
+// Gestisce la validazione dei campi e l'invio della richiesta al server backend.
 class TransferScreen extends StatefulWidget {
   const TransferScreen({super.key});
 
@@ -11,6 +13,7 @@ class TransferScreen extends StatefulWidget {
 }
 
 class _TransferScreenState extends State<TransferScreen> {
+  // GlobalKey identifica univocamente il form per permetterne la validazione.
   final _formKey = GlobalKey<FormState>();
   final _beneficiaryCtrl = TextEditingController();
   final _ibanCtrl = TextEditingController();
@@ -28,6 +31,7 @@ class _TransferScreenState extends State<TransferScreen> {
     super.dispose();
   }
 
+  // Verifica che l'IBAN inserito sia formalmente corretto.
   String? _validateIban(String? v) {
     if (v == null || v.trim().isEmpty) return 'Campo obbligatorio';
     final cleaned = v.replaceAll(' ', '').toUpperCase();
@@ -35,6 +39,7 @@ class _TransferScreenState extends State<TransferScreen> {
     return null;
   }
 
+  // Verifica che l'importo sia un numero positivo valido.
   String? _validateAmount(String? v) {
     if (v == null || v.trim().isEmpty) return 'Inserisci l\'importo';
     final n = double.tryParse(v.replaceAll(',', '.'));
@@ -43,11 +48,14 @@ class _TransferScreenState extends State<TransferScreen> {
     return null;
   }
 
+  // Esegue l'invio del bonifico previa conferma dell'utente tramite popup.
   Future<void> _submit() async {
+    // Valida tutti i campi del form prima di procedere.
     if (!_formKey.currentState!.validate()) return;
 
     final amount = double.parse(_amountCtrl.text.replaceAll(',', '.'));
 
+    // Mostra un dialogo di riepilogo per evitare invii accidentali.
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -90,6 +98,7 @@ class _TransferScreenState extends State<TransferScreen> {
     setState(() => _isLoading = true);
 
     try {
+      // Chiama il servizio API per registrare il bonifico sul server.
       await ApiService.createTransfer(
         beneficiary: _beneficiaryCtrl.text.trim(),
         iban: _ibanCtrl.text.trim(),
@@ -97,6 +106,7 @@ class _TransferScreenState extends State<TransferScreen> {
         reason: _causaleCtrl.text.trim(),
       );
 
+      // Emette un evento globale per notificare la necessità di aggiornare il saldo.
       AppEvents.emitAccountDataChanged();
 
       if (!mounted) return;
@@ -201,6 +211,7 @@ class _TransferScreenState extends State<TransferScreen> {
                   : null,
             ),
             const SizedBox(height: 32),
+            // Bottone che si disabilita durante il caricamento per evitare click doppi.
             ElevatedButton(
               onPressed: _isLoading ? null : _submit,
               child: _isLoading
@@ -221,6 +232,7 @@ class _TransferScreenState extends State<TransferScreen> {
   }
 }
 
+// Widget semplice per visualizzare etichette dei campi uniformi.
 class _FieldLabel extends StatelessWidget {
   final String text;
 
@@ -235,6 +247,7 @@ class _FieldLabel extends StatelessWidget {
   }
 }
 
+// Widget per visualizzare una riga di riepilogo nel dialogo di conferma.
 class _ConfirmRow extends StatelessWidget {
   final String label;
   final String value;

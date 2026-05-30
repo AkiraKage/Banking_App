@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+// Widget per la visualizzazione di una riga informativa con etichetta e valore.
+// Utilizzato solitamente per mostrare dettagli tecnici come l'IBAN o il titolare del conto.
 class InfoRow extends StatelessWidget {
   final String label;
   final String value;
@@ -28,6 +30,7 @@ class InfoRow extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
+          // Etichetta informativa (es. "IBAN") in grigio.
           Text(
             label,
             style: TextStyle(
@@ -35,6 +38,7 @@ class InfoRow extends StatelessWidget {
               color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
             ),
           ),
+          // Valore associato all'etichetta, evidenziato in grassetto.
           Text(
             value,
             style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),

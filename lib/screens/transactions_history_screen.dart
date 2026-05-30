@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../models/transaction_model.dart';
 import '../widgets/transaction_tile.dart';
 
+// Visualizza l'elenco completo delle transazioni effettuate dall'utente.
+// Permette di filtrare i movimenti per tipologia (Entrate/Uscite) e li raggruppa per mese.
 class TransactionsHistoryScreen extends StatefulWidget {
   final List<TransactionModel> allTransactions;
 
@@ -13,29 +15,22 @@ class TransactionsHistoryScreen extends StatefulWidget {
 }
 
 class _TransactionsHistoryScreenState extends State<TransactionsHistoryScreen> {
+  // Stato del filtro corrente: null (tutto), income (entrate) o expense (uscite).
   TransactionType? _filter;
 
   static const _months = [
-    'Gennaio',
-    'Febbraio',
-    'Marzo',
-    'Aprile',
-    'Maggio',
-    'Giugno',
-    'Luglio',
-    'Agosto',
-    'Settembre',
-    'Ottobre',
-    'Novembre',
-    'Dicembre',
+    'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
+    'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre',
   ];
 
+  // Crea una chiave univoca per il raggruppamento (es. "Maggio 2024").
   String _groupKey(TransactionModel tx) {
     final now = DateTime.now();
     final name = _months[tx.date.month - 1];
     return tx.date.year == now.year ? name : '$name ${tx.date.year}';
   }
 
+  // Raggruppa le transazioni in una mappa dove la chiave è il mese/anno.
   Map<String, List<TransactionModel>> _grouped(List<TransactionModel> txs) {
     final map = <String, List<TransactionModel>>{};
     for (final tx in txs) {
@@ -45,12 +40,14 @@ class _TransactionsHistoryScreenState extends State<TransactionsHistoryScreen> {
     return map;
   }
 
+  // Calcola il bilancio totale (entrate meno uscite) per un determinato gruppo.
   double _monthTotal(List<TransactionModel> txs) {
     return txs.fold(0.0, (sum, tx) {
       return sum + (tx.type == TransactionType.income ? tx.amount : -tx.amount);
     });
   }
 
+  // Applica l'ordinamento cronologico e il filtro selezionato alla lista originale.
   List<TransactionModel> get _filtered {
     final sorted = List<TransactionModel>.from(widget.allTransactions)
       ..sort((a, b) => b.date.compareTo(a.date));
@@ -71,6 +68,7 @@ class _TransactionsHistoryScreenState extends State<TransactionsHistoryScreen> {
       ),
       body: Column(
         children: [
+          // Barra superiore con i chip per filtrare i dati.
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
             child: Row(
@@ -124,6 +122,7 @@ class _TransactionsHistoryScreenState extends State<TransactionsHistoryScreen> {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Intestazione del gruppo (Mese) con riepilogo del saldo mensile.
                     Padding(
                       padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
                       child: Row(
@@ -151,6 +150,7 @@ class _TransactionsHistoryScreenState extends State<TransactionsHistoryScreen> {
                         ],
                       ),
                     ),
+                    // Lista delle transazioni appartenenti a questo mese.
                     ...txs.map(
                           (tx) => TransactionTile(
                         tx: tx,
@@ -181,6 +181,7 @@ class _TransactionsHistoryScreenState extends State<TransactionsHistoryScreen> {
   }
 }
 
+// Widget privato per visualizzare un pulsante di filtro (Chip) stilizzato.
 class _FilterChip extends StatelessWidget {
   final String label;
   final bool selected;

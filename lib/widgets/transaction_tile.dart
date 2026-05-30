@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/transaction_model.dart';
 
+// Rappresenta un singolo elemento della lista transazioni.
+// Visualizza l'icona della categoria, il titolo, la data e l'importo colorato (verde/rosso).
 class TransactionTile extends StatelessWidget {
   final TransactionModel tx;
   final bool isDark;
@@ -21,11 +23,13 @@ class TransactionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Determina il colore in base al tipo di transazione: entrate in verde, uscite in rosso.
     final isIncome = tx.type == TransactionType.income;
     final amountColor = isIncome
         ? Theme.of(context).colorScheme.secondary
         : const Color(0xFFEF4444);
 
+    // Configura lo stile del contenitore (bordo e sfondo) in base alle proprietà ricevute.
     final decoration = (withBackground || withBorder)
         ? BoxDecoration(
             color: withBackground
@@ -48,6 +52,7 @@ class TransactionTile extends StatelessWidget {
       decoration: decoration,
       child: Row(
         children: [
+          // Icona identificativa della categoria con un cerchio di sfondo semitrasparente.
           Container(
             padding: const EdgeInsets.all(9),
             decoration: BoxDecoration(
@@ -57,6 +62,7 @@ class TransactionTile extends StatelessWidget {
             child: Icon(tx.icon, color: amountColor, size: 20),
           ),
           const SizedBox(width: 12),
+          // Informazioni descrittive: titolo e data formattata.
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -83,6 +89,7 @@ class TransactionTile extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
+          // Valore monetario della transazione.
           Text(
             tx.formattedAmount,
             style: TextStyle(

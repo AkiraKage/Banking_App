@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+// Widget semplice per visualizzare un'intestazione di sezione in maiuscolo.
+// Utilizzato solitamente tra gruppi di impostazioni per migliorare l'organizzazione visiva.
 class SectionHeader extends StatelessWidget {
   final String label;
   final bool isDark;

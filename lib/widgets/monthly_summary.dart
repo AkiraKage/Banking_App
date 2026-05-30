@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+// Widget che affianca due schede riassuntive per entrate e uscite mensili.
+// Utilizza Expanded per dividere equamente lo spazio orizzontale disponibile.
 class MonthlySummaryRow extends StatelessWidget {
   final double income;
   final double expense;
@@ -42,6 +44,7 @@ class MonthlySummaryRow extends StatelessWidget {
   }
 }
 
+// Widget per una singola scheda di riepilogo (es. solo entrate o solo uscite).
 class SummaryCard extends StatelessWidget {
   final String label;
   final double amount;
@@ -71,6 +74,7 @@ class SummaryCard extends StatelessWidget {
       ),
       child: Row(
         children: [
+          // Icona con freccia direzionale racchiusa in un box colorato.
           Container(
             padding: const EdgeInsets.all(7),
             decoration: BoxDecoration(
@@ -84,6 +88,7 @@ class SummaryCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Etichetta descrittiva (es. "Entrate").
                 Text(
                   label,
                   style: TextStyle(
@@ -95,6 +100,7 @@ class SummaryCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 2),
+                // Valore totale formattato con due decimali.
                 Text(
                   '€ ${amount.toStringAsFixed(2).replaceAll('.', ',')}',
                   style: TextStyle(

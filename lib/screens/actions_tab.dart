@@ -6,10 +6,12 @@ import '../widgets/info_row.dart';
 import 'transfer_screen.dart';
 import 'qr_deposit_screen.dart';
 
+// Rappresenta la scheda dedicata alle operazioni dispositive (bonifici, versamenti).
+// Fornisce un accesso rapido alle funzioni principali di movimentazione fondi.
 class ActionsTab extends StatelessWidget {
   const ActionsTab({super.key});
 
-  // Formatta IBAN in gruppi di 4 per leggibilità
+  // Formatta la stringa IBAN aggiungendo uno spazio ogni 4 caratteri per una migliore leggibilità.
   String _formatIban(String iban) {
     final clean = iban.replaceAll(' ', '');
     final buffer = StringBuffer();
@@ -25,6 +27,7 @@ class ActionsTab extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primary = Theme.of(context).colorScheme.primary;
     final secondary = Theme.of(context).colorScheme.secondary;
+    // Recupera i dati dell'utente dal provider per visualizzare le info del conto.
     final authProvider = Provider.of<AuthProvider>(context);
 
     final ibanDisplay = authProvider.userIban.isNotEmpty
@@ -52,6 +55,7 @@ class ActionsTab extends StatelessWidget {
               ),
             ),
           ),
+          // Pulsante per navigare alla schermata del bonifico.
           ActionCard(
             title: 'Bonifico Bancario',
             subtitle: 'Trasferisci denaro verso un IBAN',
@@ -64,6 +68,7 @@ class ActionsTab extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
+          // Pulsante per navigare alla scansione del QR code.
           ActionCard(
             title: 'Versamento QR',
             subtitle: 'Scansiona il QR dell\'esercente',
@@ -89,6 +94,7 @@ class ActionsTab extends StatelessWidget {
               ),
             ),
           ),
+          // Visualizza i dettagli tecnici del conto corrente dell'utente.
           InfoRow(label: 'IBAN', value: ibanDisplay, isDark: isDark),
           InfoRow(label: 'BIC/SWIFT', value: 'BLOKIT22', isDark: isDark),
           InfoRow(
